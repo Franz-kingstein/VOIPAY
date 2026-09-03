@@ -1,0 +1,10 @@
+fastapi>=0.100.0
+uvicorn>=0.22.0
+numpy>=1.20.0
+gtts>=2.3.0
+redis>=4.6.0
+httpx>=0.24.0
+pyjwt>=2.8.0
+anyio>=3.7.0
+websockets>=11.0
+# faster-whisper  # uncomment to enable local whisper model execution

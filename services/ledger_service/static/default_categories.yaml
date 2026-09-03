@@ -1,0 +1,14 @@
+- name: Groceries
+  nature: need
+- name: Dining Out
+  nature: want
+- name: Utilities
+  nature: must
+- name: Transport
+  nature: need
+- name: Entertainment
+  nature: want
+- name: Rent
+  nature: must
+- name: Other
+  nature: need

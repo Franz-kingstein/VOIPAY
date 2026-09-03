@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Voice-to-Pay Demo Console</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Step-up PIN Modal Overlay -->
+    <div id="pin-modal-overlay" class="pin-modal-overlay">
+        <div class="pin-modal-card">
+            <div class="pin-modal-header">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h3>Enter Backup PIN</h3>
+                <p>Borderline biometric score. Please enter your backup 4-digit payment PIN to authorize.</p>
+            </div>
+            <div class="pin-display-container">
+                <div class="pin-dot" id="dot-0"></div>
+                <div class="pin-dot" id="dot-1"></div>
+                <div class="pin-dot" id="dot-2"></div>
+                <div class="pin-dot" id="dot-3"></div>
+            </div>
+            <div class="pin-keyboard">
+                <button class="pin-key num-key" data-val="1">1</button>
+                <button class="pin-key num-key" data-val="2">2</button>
+                <button class="pin-key num-key" data-val="3">3</button>
+                
+                <button class="pin-key num-key" data-val="4">4</button>
+                <button class="pin-key num-key" data-val="5">5</button>
+                <button class="pin-key num-key" data-val="6">6</button>
+                
+                <button class="pin-key num-key" data-val="7">7</button>
+                <button class="pin-key num-key" data-val="8">8</button>
+                <button class="pin-key num-key" data-val="9">9</button>
+                
+                <button class="pin-key action-delete" id="pin-del-btn"><i class="fa-solid fa-delete-left"></i></button>
+                <button class="pin-key num-key" data-val="0">0</button>
+                <button class="pin-key action-delete" style="visibility: hidden;"></button>
+            </div>
+            <div class="pin-modal-actions">
+                <button id="pin-cancel-btn" class="pin-btn cancel">Cancel</button>
+                <button id="pin-submit-btn" class="pin-btn submit">Authorize</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-wand-magic-sparkles logo-icon"></i>
+                <div class="logo-text">
+                    <h1>Razorpay <span>Voice-to-Pay</span></h1>
+                    <p class="subtitle">AI Agent Buildathon Replica Console</p>
+                </div>
+            </div>
+            <div class="session-badge">
+                <span class="pulse-dot"></span>
+                <span>Session ID: </span><strong id="session-id-display">Generating...</strong>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            
+            <!-- Left Panel: Control / Audio Input -->
+            <section class="panel voice-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-microphone"></i> Voice Agent Controller</h2>
+                    <span class="badge label-gateway">Voice Gateway</span>
+                </div>
+                
+                <div class="mic-container">
+                    <button id="mic-btn" class="mic-button idle">
+                        <div class="orb"></div>
+                        <i class="fa-solid fa-microphone mic-icon"></i>
+                    </button>
+                    <p id="mic-instructions" class="instructions">Click the orb to start speaking</p>
+                </div>
+
+                <div class="manual-input-box">
+                    <div class="input-divider"><span>OR TYPE YOUR COMMAND</span></div>
+                    <form id="text-input-form" class="text-input-form">
+                        <input type="text" id="manual-text" placeholder="e.g., Pay 500 rupees to Ramesh for groceries..." autocomplete="off">
+                        <button type="submit"><i class="fa-solid fa-paper-plane"></i></button>
+                    </form>
+                </div>
+
+                <div class="transcript-display">
+                    <h3><i class="fa-solid fa-quote-left"></i> ASR Transcript</h3>
+                    <div id="asr-text" class="text-placeholder">Speak to begin transcription...</div>
+                </div>
+
+                <div class="reply-display">
+                    <h3><i class="fa-solid fa-comment-dots"></i> Agent Spoken Reply</h3>
+                    <div id="agent-speech-text" class="text-placeholder">Agent reply will appear here...</div>
+                    <div class="reply-meta">
+                        <span id="reply-action" class="action-tag">State: IDLE</span>
+                        <audio id="tts-audio" controls style="display: none;"></audio>
+                    </div>
+                </div>
+
+                <div class="biometric-security-display">
+                    <h3><i class="fa-solid fa-fingerprint"></i> Voice Biometrics Security</h3>
+                    <div class="biometric-grid">
+                        <div class="bio-status-card">
+                            <span class="bio-label">Voice Signature</span>
+                            <span id="bio-signature-badge" class="badge label-warning">Not Enrolled</span>
+                        </div>
+                        <div class="bio-status-card">
+                            <span class="bio-label">Speaker Match</span>
+                            <span id="bio-match-badge" class="badge label-trace">N/A</span>
+                        </div>
+                        <div class="bio-status-card">
+                            <span class="bio-label">Liveness Test</span>
+                            <span id="bio-liveness-badge" class="badge label-trace">N/A</span>
+                        </div>
+                    </div>
+                    <div class="bio-actions">
+                        <button id="enroll-bio-btn" class="bio-btn enroll"><i class="fa-solid fa-microphone"></i> Enroll</button>
+                        <button id="clear-bio-btn" class="bio-btn clear"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                    </div>
+                    <div id="bio-feedback-text" class="bio-feedback">Enroll voice signature to enable biometric security.</div>
+                    
+                    <div class="bio-audit-header">
+                        <h4>Security Audit Log</h4>
+                    </div>
+                    <div id="bio-audit-logs" class="bio-audit-container">
+                        <div class="audit-row-empty">No security logs recorded yet.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Middle Panel: Trace Waterfall Logs -->
+            <section class="panel trace-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-network-wired"></i> Transaction Trace Waterfall</h2>
+                    <span class="badge label-trace">Trace ID flow</span>
+                </div>
+                <div class="trace-info">
+                    <span>Trace ID: </span><code id="current-trace-id">N/A</code>
+                </div>
+                <div id="trace-waterfall" class="waterfall-container">
+                    <div class="waterfall-empty">
+                        <i class="fa-solid fa-route"></i>
+                        <p>No transaction trace available yet. Speak a payment command to generate trace logs.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Live Webhook feed and order status -->
+            <section class="panel event-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-bell"></i> Live Webhook Outcomes</h2>
+                    <span class="badge label-webhook">HMAC Verified</span>
+                </div>
+                
+                <!-- Large Status Alert Banner -->
+                <div id="status-banner" class="status-banner inactive">
+                    <div class="banner-icon">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
+                    <div class="banner-content">
+                        <h4 id="banner-title">Waiting</h4>
+                        <p id="banner-desc">Send payment command to trigger webhook outcome.</p>
+                    </div>
+                </div>
+
+                <div class="event-feed-header">
+                    <h3>Webhook Event Log</h3>
+                    <button id="clear-log-btn" class="clear-btn"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                </div>
+                
+                <div id="webhook-feed" class="feed-container">
+                    <!-- Events will accumulate here -->
+                    <div class="feed-empty">
+                        <i class="fa-solid fa-envelope-open-text"></i>
+                        <p>Waiting for webhook callback packets from dispatcher...</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Main Controller Logic Javascript -->
+    <script>
+        // Generate persistent session ID for demo
+        let sessionId = localStorage.getItem("voice_pay_session_id");
+        if (!sessionId) {
+            sessionId = "sess_" + Math.random().toString(36).substring(2, 10);
+            localStorage.setItem("voice_pay_session_id", sessionId);
+        }
+        document.getElementById("session-id-display").innerText = sessionId;
+
+        const micBtn = document.getElementById("mic-btn");
+        const micInstructions = document.getElementById("mic-instructions");
+        const asrText = document.getElementById("asr-text");
+        const agentSpeechText = document.getElementById("agent-speech-text");
+        const replyAction = document.getElementById("reply-action");
+        const ttsAudio = document.getElementById("tts-audio");
+        const textInputForm = document.getElementById("text-input-form");
+        const manualText = document.getElementById("manual-text");
+        const currentTraceId = document.getElementById("current-trace-id");
+        const traceWaterfall = document.getElementById("trace-waterfall");
+        const statusBanner = document.getElementById("status-banner");
+        const bannerTitle = document.getElementById("banner-title");
+        const bannerDesc = document.getElementById("banner-desc");
+        const webhookFeed = document.getElementById("webhook-feed");
+        const clearLogBtn = document.getElementById("clear-log-btn");
+        
+        // Biometrics security dashboard elements
+        const enrollBioBtn = document.getElementById("enroll-bio-btn");
+        const clearBioBtn = document.getElementById("clear-bio-btn");
+        const bioSignatureBadge = document.getElementById("bio-signature-badge");
+        const bioMatchBadge = document.getElementById("bio-match-badge");
+        const bioLivenessBadge = document.getElementById("bio-liveness-badge");
+        const bioFeedbackText = document.getElementById("bio-feedback-text");
+        let lastBiometricResult = null;
+
+        let socket = null;
+        let mediaRecorder = null;
+        let audioContext = null;
+        let isRecording = false;
+        let audioStream = null;
+        let audioProcessor = null;
+        let audioInput = null;
+
+        // Establish SSE Connection to Merchant App for live webhooks
+        const eventSource = new EventSource("/events");
+        eventSource.onmessage = function(event) {
+            const data = jsonParse(event.data);
+            if (data) {
+                addWebhookEventToFeed(data);
+                triggerStatusBanner(data);
+                generateTraceWaterfall(data.trace_id, data);
+            }
+        };
+
+        function jsonParse(str) {
+            try {
+                return JSON.parse(str);
+            } catch(e) {
+                return null;
+            }
+        }
+
+        // Establish WebSocket connection to Voice Gateway
+        function connectWebSocket() {
+            // Determine ws protocol based on location
+            const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+            // Voice gateway runs on port 8000 (proxied or hit directly)
+            // For simple single container compose routing or local testing:
+            // If the merchant app is running on localhost:8080 and Voice Gateway is on 8000:
+            const host = window.location.hostname;
+            const gatewayUrl = `${proto}//${host}:8000/ws/audio/${sessionId}`;
+            
+            loggerLog("Connecting to Voice Gateway at " + gatewayUrl);
+            socket = new WebSocket(gatewayUrl);
+            
+            socket.onopen = () => {
+                socket.binaryType = 'arraybuffer';
+                loggerLog("Connected to Voice Gateway");
+                // Check biometrics enrollment status
+                socket.send(JSON.stringify({ type: "check_status" }));
+            };
+            
+            socket.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleGatewayMessage(msg);
+            };
+            
+            socket.onclose = () => {
+                loggerLog("Voice Gateway disconnected. Reconnecting in 3s...");
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        connectWebSocket();
+
+        function handleGatewayMessage(msg) {
+            loggerLog("Message from Gateway: " + msg.type, msg);
+            
+            if (msg.type === "config") {
+                loggerLog("Received short-lived session JWT token");
+            } 
+            else if (msg.type === "biometric_status") {
+                if (msg.enrolled) {
+                    bioSignatureBadge.innerText = "Enrolled";
+                    bioSignatureBadge.className = "badge label-webhook";
+                    bioFeedbackText.innerText = msg.msg || "Voice biometric signature is active and protecting your session.";
+                } else {
+                    bioSignatureBadge.innerText = "Not Enrolled";
+                    bioSignatureBadge.className = "badge label-warning";
+                    bioFeedbackText.innerText = msg.msg || "Enroll voice signature to enable biometric security.";
+                }
+            }
+            else if (msg.type === "biometric_verification") {
+                lastBiometricResult = msg;
+                if (msg.enrolled) {
+                    if (msg.passed) {
+                        bioMatchBadge.innerText = `${msg.biometric_score.toFixed(0)}% Match`;
+                        bioMatchBadge.className = "badge label-webhook";
+                    } else {
+                        bioMatchBadge.innerText = "Mismatch";
+                        bioMatchBadge.className = "badge label-danger";
+                    }
+                } else {
+                    bioMatchBadge.innerText = "N/A";
+                    bioMatchBadge.className = "badge label-trace";
+                }
+                
+                if (msg.liveness_passed) {
+                    bioLivenessBadge.innerText = "Human Voice";
+                    bioLivenessBadge.className = "badge label-webhook";
+                } else {
+                    bioLivenessBadge.innerText = "Spoof Detected";
+                    bioLivenessBadge.className = "badge label-danger";
+                }
+                
+                if (!msg.liveness_passed) {
+                    bioFeedbackText.innerText = "Security Alert: Artificial voice clone or replayed speech detected!";
+                } else if (msg.enrolled && !msg.passed) {
+                    bioFeedbackText.innerText = "Security Alert: Speaker voice biometric signature mismatch!";
+                } else {
+                    bioFeedbackText.innerText = `Verified: Speaker match (${msg.biometric_score.toFixed(1)}%). Liveness confidence (${msg.liveness_score.toFixed(1)}%).`;
+                }
+                
+                // Append this event details directly to the Security Audit Log Console
+                addBioAuditLog(msg);
+            }
+            else if (msg.type === "transcript") {
+                asrText.innerText = msg.text;
+                asrText.classList.remove("text-placeholder");
+            } 
+            else if (msg.type === "agent_reply") {
+                agentSpeechText.innerText = msg.text;
+                agentSpeechText.classList.remove("text-placeholder");
+                replyAction.innerText = "State: " + msg.action.toUpperCase();
+                replyAction.className = "action-tag " + msg.action;
+                
+                if (msg.action === "step_up") {
+                    showPinModal();
+                }
+                
+                // Play audio bytes
+                if (msg.audio) {
+                    playAudioFromB64(msg.audio, msg.audio_mime);
+                }
+            }
+            else if (msg.type === "webhook_event") {
+                // Audio outcome played automatically from Redis Pub/Sub trigger
+                if (msg.audio) {
+                    playAudioFromB64(msg.audio, msg.audio_mime);
+                }
+            }
+            else if (msg.type === "error") {
+                asrText.innerText = "Error: " + msg.msg;
+                asrText.classList.add("text-placeholder");
+            }
+        }
+
+        function playAudioFromB64(b64Data, mimeType) {
+            if (isRecording) {
+                loggerLog("Skipping TTS audio playback because microphone is currently active.");
+                return;
+            }
+            try {
+                const actualMime = mimeType || "audio/wav";
+                const audioSrc = "data:" + actualMime + ";base64," + b64Data;
+                
+                // Detailed error handler for diagnostics
+                ttsAudio.onerror = () => {
+                    if (ttsAudio.error) {
+                        loggerLog("Audio decoder error: code=" + ttsAudio.error.code + ", message=" + ttsAudio.error.message);
+                    } else {
+                        loggerLog("Audio decoder error occurred");
+                    }
+                };
+                
+                ttsAudio.src = audioSrc;
+                ttsAudio.style.display = "block";
+                ttsAudio.play().catch(e => loggerLog("Audio play policy blocked manual trigger: ", e));
+            } catch(err) {
+                loggerLog("Audio processing error: ", err);
+            }
+        }
+
+        // Programmatic synthesizer for a gentle, premium start beep
+        function playGentleBeep(audioCtx) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                osc.type = "sine"; // Smooth waveform
+                osc.frequency.setValueAtTime(850, audioCtx.currentTime); // 850Hz clean tone
+                
+                // Set gain envelope for a gentle decay
+                gainNode.gain.setValueAtTime(0.0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.02); // 20ms attack
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime + 0.10);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22); // Fade out over 120ms
+                
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.22);
+            } catch (err) {
+                loggerLog("Chime synthesis failed: ", err);
+            }
+        }
+
+        // Programmatic synthesizer for a very subtle progress tick (e.g. clock tick)
+        function playGentleTick(audioCtx) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(1400, audioCtx.currentTime); // High pitch tick
+                
+                // Very low volume, rapid decay envelope to make it feel like a mechanical tick
+                gainNode.gain.setValueAtTime(0.0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 0.002);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.015); // 15ms duration
+                
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.015);
+            } catch (err) {
+                // ignore synthesis failure
+            }
+        }
+        // Print structured details of a biometric check to the Audit Log UI console
+        function addBioAuditLog(msg) {
+            const container = document.getElementById("bio-audit-logs");
+            if (!container) return;
+            
+            // Remove empty row placeholder
+            const emptyRow = container.querySelector(".audit-row-empty");
+            if (emptyRow) {
+                emptyRow.remove();
+            }
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement("div");
+            entry.className = "audit-entry";
+            
+            let statusClass = "audit-success";
+            let statusText = "Voice Verified [PASS]";
+            let details = "";
+            
+            // Evaluate outcome logic
+            const passed = (!msg.enrolled || msg.passed) && msg.liveness_passed;
+            if (!passed) {
+                statusClass = "audit-failed";
+                statusText = "Verification Failed [BLOCK]";
+            }
+            
+            const pitchVal = msg.pitch_jitter !== undefined ? msg.pitch_jitter : 0.0;
+            const lowVal = msg.low_ratio !== undefined ? msg.low_ratio : 0.0;
+            const highVal = msg.high_ratio !== undefined ? msg.high_ratio : 0.0;
+            const cadenceTempo = msg.cadence_tempo !== undefined ? msg.cadence_tempo : 0.0;
+            const cadenceRhythm = msg.cadence_rhythm !== undefined ? msg.cadence_rhythm : 0.0;
+            
+            details += `• Liveness Check: ${msg.liveness_passed ? "PASS" : "FAIL"} (score: ${msg.liveness_score.toFixed(1)}%)\n`;
+            details += `  - Pitch Variance Jitter: ${pitchVal.toFixed(2)} Hz (threshold > 4.00 Hz)\n`;
+            details += `  - Speech Cadence: tempo=${cadenceTempo.toFixed(1)} syllables/sec, rhythm_stdev=${cadenceRhythm.toFixed(1)} frames (threshold > 0.5)\n`;
+            details += `  - High/Low Spectral Ratios: low=${lowVal.toFixed(5)}, high=${highVal.toFixed(5)} (replay threshold > 0.0005)\n`;
+            
+            if (msg.enrolled) {
+                details += `• Speaker Matching: ${msg.passed ? "PASS" : "FAIL"} (distance: ${msg.distance.toFixed(2)}, match: ${msg.biometric_score.toFixed(1)}%)`;
+            } else {
+                details += `• Speaker Matching: N/A (Owner signature not enrolled yet)`;
+            }
+            
+            entry.innerHTML = `
+                <span class="audit-time">[${timestamp}]</span> <span class="${statusClass}">${statusText}</span>
+                <span class="audit-detail">${details}</span>
+            `;
+            
+            container.prepend(entry);
+            
+            // Limit to last 10 entries to preserve performance
+            while (container.children.length > 10) {
+                container.lastChild.remove();
+            }
+        }
+
+        // Downsample Float32 mono buffer to outSampleRate
+        function downsampleBuffer(buffer, sampleRate, outSampleRate) {
+            if (outSampleRate === sampleRate) {
+                return buffer;
+            }
+            if (outSampleRate > sampleRate) {
+                throw "downsampling rate should be smaller than original sample rate";
+            }
+            const sampleRateRatio = sampleRate / outSampleRate;
+            const newLength = Math.round(buffer.length / sampleRateRatio);
+            const result = new Float32Array(newLength);
+            let offsetResult = 0;
+            let offsetBuffer = 0;
+            while (offsetResult < result.length) {
+                const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+                let accum = 0, count = 0;
+                for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+                    accum += buffer[i];
+                    count++;
+                }
+                result[offsetResult] = count > 0 ? accum / count : 0;
+                offsetResult++;
+                offsetBuffer = nextOffsetBuffer;
+            }
+            return result;
+        }
+
+        // Convert Float32Array into Int16 PCM DataView
+        function convertFloat32To16BitPCM(buffer) {
+            const buf = new ArrayBuffer(buffer.length * 2);
+            const view = new DataView(buf);
+            for (let i = 0; i < buffer.length; i++) {
+                const s = Math.max(-1, Math.min(1, buffer[i]));
+                view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); // littleEndian = true
+            }
+            return new Uint8Array(buf);
+        }
+
+        micBtn.addEventListener("click", async () => {
+            if (isRecording) {
+                // Stop recording
+                isRecording = false;
+                micBtn.className = "mic-button idle";
+                micInstructions.innerText = "Click the orb to start speaking";
+                
+                if (audioProcessor) {
+                    audioProcessor.disconnect();
+                    audioProcessor.onaudioprocess = null;
+                    audioProcessor = null;
+                }
+                if (audioInput) {
+                    audioInput.disconnect();
+                    audioInput = null;
+                }
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                    audioStream = null;
+                }
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                }
+                
+                // Send stop sequence (a small binary chunk) to flush VAD immediately
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    const silence = new Uint8Array(100);
+                    socket.send(silence);
+                }
+            } else {
+                // Stop any playing TTS audio immediately
+                if (ttsAudio) {
+                    ttsAudio.pause();
+                    ttsAudio.currentTime = 0;
+                    loggerLog("Interrupted active TTS playback on mic start.");
+                }
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: true
+                        },
+                        video: false
+                    });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    await audioContext.resume();
+                    
+                    let lastSpeechTimestamp = Date.now();
+                    const silenceTimeoutMs = 5000;
+                    let speechThreshold = 0.01; // default fallback
+                    let calibrationFrames = [];
+                    const calibrationCount = 15; // ~700ms calibration window
+                    
+                    const bufferSize = 4096;
+                    audioInput = audioContext.createMediaStreamSource(audioStream);
+                    audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+                    
+                    audioProcessor.onaudioprocess = (e) => {
+                        if (!isRecording) return;
+                        const inputBuffer = e.inputBuffer.getChannelData(0); // Float32 mono
+                        
+                        // Calculate RMS energy to detect speech activity
+                        let sum = 0;
+                        for (let i = 0; i < inputBuffer.length; i++) {
+                            sum += inputBuffer[i] * inputBuffer[i];
+                        }
+                        const rms = Math.sqrt(sum / inputBuffer.length);
+                        
+                        // 1. Calibrate background noise threshold during initial frames
+                        if (calibrationFrames.length < calibrationCount) {
+                            calibrationFrames.push(rms);
+                            micInstructions.innerText = "Calibrating microphone... Please wait.";
+                            
+                            // Play a tick sound every 3 frames (~250ms) to indicate progress
+                            if (calibrationFrames.length % 3 === 1) {
+                                playGentleTick(audioContext);
+                            }
+                            
+                            lastSpeechTimestamp = Date.now();
+                            if (calibrationFrames.length === calibrationCount) {
+                                const avgNoise = calibrationFrames.reduce((a, b) => a + b, 0) / calibrationFrames.length;
+                                speechThreshold = Math.max(0.01, avgNoise * 2.5); // Set speech gate to 2.5x noise floor
+                                loggerLog("Adaptive speechThreshold calibrated: " + speechThreshold.toFixed(4));
+                                
+                                // Play gentle start chime indicator
+                                playGentleBeep(audioContext);
+                                
+                                lastSpeechTimestamp = Date.now(); // Reset timestamp to start 5s window after chime
+                            }
+                            return;
+                        }
+                        
+                        // 2. Main speech energy gating loop
+                        if (rms > speechThreshold) {
+                            lastSpeechTimestamp = Date.now();
+                            micInstructions.innerText = "Listening... Speak now. Click orb again to stop and send.";
+                        } else {
+                            const silentSecs = (Date.now() - lastSpeechTimestamp) / 1000;
+                            const remaining = Math.max(0, 5.0 - silentSecs).toFixed(1);
+                            micInstructions.innerText = `Listening... Speak now. Auto-stop in ${remaining}s of silence.`;
+                            
+                            if (Date.now() - lastSpeechTimestamp >= silenceTimeoutMs) {
+                                loggerLog("Auto-stopping microphone due to 5 seconds of silence.");
+                                micBtn.click(); // Programmatically stop and submit audio
+                                return;
+                            }
+                        }
+                        
+                        // Downsample buffer to 16kHz
+                        const downsampled = downsampleBuffer(inputBuffer, audioContext.sampleRate, 16000);
+                        const pcm16 = convertFloat32To16BitPCM(downsampled);
+                        
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(pcm16);
+                        }
+                    };
+                    
+                    audioInput.connect(audioProcessor);
+                    audioProcessor.connect(audioContext.destination);
+                    
+                    isRecording = true;
+                    micBtn.className = "mic-button recording";
+                    micInstructions.innerText = "Listening... Speak now. Click orb again to stop and send.";
+                    
+                    loggerLog("Started recording from real microphone at " + audioContext.sampleRate + "Hz. Streaming 16000Hz PCM.");
+                } catch (err) {
+                    loggerLog("Microphone access failed: ", err);
+                    alert("Could not access microphone. Make sure you are using localhost and have given microphone permission in Firefox.");
+                }
+            }
+        });
+
+        // Setup Manual text submit
+        textInputForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const text = manualText.value.trim();
+            if (!text) return;
+            
+            asrText.innerText = text;
+            asrText.classList.remove("text-placeholder");
+            manualText.value = "";
+            
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "text_input",
+                    text: text
+                }));
+            } else {
+                alert("Voice Gateway not connected yet. Check server status.");
+            }
+        });
+
+        // Render waterfall hops for the transaction
+        function generateTraceWaterfall(traceId, event) {
+            currentTraceId.innerText = traceId;
+            const payload = event.payload;
+            const isSuccess = event.event_type === "payment.captured";
+            
+            let hops = [];
+            if (lastBiometricResult) {
+                hops.push({
+                    service: "Voice Gateway",
+                    msg: `Voice biometrics: ${lastBiometricResult.passed ? 'PASSED' : 'FAILED'} (Score: ${lastBiometricResult.biometric_score.toFixed(1)}%), Liveness: ${lastBiometricResult.liveness_passed ? 'VERIFIED' : 'SPOOF'} (Score: ${lastBiometricResult.liveness_score.toFixed(1)}%)`,
+                    time: "-1300ms",
+                    error: !lastBiometricResult.passed || !lastBiometricResult.liveness_passed
+                });
+            }
+            
+            hops.push(
+                { service: "Voice Gateway", msg: "WS audio chunk received & sliced", time: "-1200ms" },
+                { service: "Voice Gateway", msg: "Transcribed: '" + (payload.amount ? `Pay ${payload.amount} to ${payload.payee_name}` : "Payment command") + "'", time: "-1000ms" },
+                { service: "Agent Core", msg: "Running Pydantic AI orchestrator logic. Cart parsed.", time: "-850ms" },
+                { service: "MCP Server", msg: "create_order() invoked. DB Order entry created.", time: "-700ms" },
+                { service: "MCP Server", msg: "Risk Engine check passed. Anomaly Score: " + (payload.risk_score || 0.02) + " (allow)", time: "-600ms" },
+                { service: "MCP Server", msg: "Idempotency validation complete. Lock acquired.", time: "-550ms" }
+            );
+            
+            if (payload.reasons && payload.reasons[0] && payload.reasons[0].includes("Mandate limits")) {
+                hops.push(
+                    { service: "Bank Simulator", msg: "UPI ReservePay limit check: EXCEEDED", time: "-300ms", error: true },
+                    { service: "MCP Server", msg: "Payment status finalized: FAILED", time: "-100ms", error: true }
+                );
+            } else if (payload.reasons && payload.reasons[0] && payload.reasons[0].includes("IsolationForest")) {
+                hops.push(
+                    { service: "Risk Engine", msg: "Vulcan AI replacement score exceeded threshold: DECLINED", time: "-450ms", error: true },
+                    { service: "MCP Server", msg: "Payment status finalized: FAILED", time: "-100ms", error: true }
+                );
+            } else {
+                hops.push(
+                    { service: "Bank Simulator", msg: "NPCI core switch debited successfully. UTR: " + (payload.utr_number || "UTR7892398293"), time: "-300ms" },
+                    { service: "MCP Server", msg: "Payment status finalized: CAPTURED", time: "-100ms" }
+                );
+            }
+            
+            hops.push(
+                { service: "Webhook Dispatcher", msg: "Generated HMAC payload signature. Dispatched.", time: "-20ms" },
+                { service: "Merchant App", msg: "Received signature verification: OK. Feed updated.", time: "0ms" }
+            );
+
+            let html = '<div class="waterfall-list">';
+            hops.forEach((hop, i) => {
+                const statusClass = hop.error ? 'err' : (i === hops.length - 1 ? 'latest' : 'done');
+                const icon = hop.error ? 'fa-circle-xmark' : (i === hops.length - 1 ? 'fa-location-dot' : 'fa-circle-check');
+                html += `
+                    <div class="waterfall-item ${statusClass}">
+                        <div class="hop-icon"><i class="fa-solid ${icon}"></i></div>
+                        <div class="hop-details">
+                            <span class="hop-service">[${hop.service}]</span>
+                            <span class="hop-msg">${hop.msg}</span>
+                        </div>
+                        <div class="hop-time">${hop.time}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            traceWaterfall.innerHTML = html;
+        }
+
+        // Large Banner Alerts
+        function triggerStatusBanner(event) {
+            const payload = event.payload;
+            statusBanner.className = "status-banner active " + (event.event_type === "payment.captured" ? "success" : "failed");
+            
+            if (event.event_type === "payment.captured") {
+                bannerTitle.innerText = "Payment Successful ✅";
+                bannerDesc.innerText = `Received ₹${payload.amount || 500.0} from ${payload.payee_name || 'Ramesh'}. UTR: ${payload.utr_number}.`;
+                statusBanner.querySelector(".banner-icon").innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else {
+                bannerTitle.innerText = "Payment Declined ❌";
+                const reason = (payload.reasons ? payload.reasons.join(", ") : "NPCI transaction fail");
+                bannerDesc.innerText = `Transaction failed: ${reason}.`;
+                statusBanner.querySelector(".banner-icon").innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
+        }
+
+        // Webhook log feed list
+        function addWebhookEventToFeed(event) {
+            const payload = event.payload;
+            const isSuccess = event.event_type === "payment.captured";
+            
+            // Remove empty placeholder
+            const placeholder = webhookFeed.querySelector(".feed-empty");
+            if (placeholder) {
+                placeholder.remove();
+            }
+            
+            const timeStr = new Date(event.timestamp * 1000).toLocaleTimeString();
+            
+            const item = document.createElement("div");
+            item.className = "feed-item " + (isSuccess ? "success" : "failed");
+            item.innerHTML = `
+                <div class="feed-item-header">
+                    <span class="event-type">${event.event_type.toUpperCase()}</span>
+                    <span class="event-time">${timeStr}</span>
+                </div>
+                <div class="feed-item-body">
+                    <p><strong>Payment ID:</strong> <code>${payload.payment_id}</code></p>
+                    <p><strong>Order ID:</strong> <code>${payload.order_id}</code></p>
+                    <p><strong>Status:</strong> <span class="status-pill">${payload.status.toUpperCase()}</span></p>
+                    ${payload.utr_number ? `<p><strong>UTR:</strong> <code>${payload.utr_number}</code></p>` : ''}
+                    ${payload.reasons ? `<p><strong>Details:</strong> <span class="reasons">${payload.reasons.join(", ")}</span></p>` : ''}
+                    <p class="trace-ref">Trace: <code>${event.trace_id.substring(0,8)}...</code></p>
+                </div>
+            `;
+            // Prepend
+            webhookFeed.insertBefore(item, webhookFeed.firstChild);
+        }
+
+        // Clear dashboard event list
+        clearLogBtn.addEventListener("click", () => {
+            fetch("/api/events/clear", { method: "POST" })
+                .then(() => {
+                    webhookFeed.innerHTML = `
+                        <div class="feed-empty">
+                            <i class="fa-solid fa-envelope-open-text"></i>
+                            <p>Waiting for webhook callback packets from dispatcher...</p>
+                        </div>
+                    `;
+                    statusBanner.className = "status-banner inactive";
+                    statusBanner.querySelector(".banner-icon").innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+                    bannerTitle.innerText = "Waiting";
+                    bannerDesc.innerText = "Send payment command to trigger webhook outcome.";
+                    traceWaterfall.innerHTML = `
+                        <div class="waterfall-empty">
+                            <i class="fa-solid fa-route"></i>
+                            <p>No transaction trace available yet. Speak a payment command to generate trace logs.</p>
+                        </div>
+                    `;
+                    currentTraceId.innerText = "N/A";
+                    
+                    // Reset biometric trace statuses
+                    lastBiometricResult = null;
+                    bioMatchBadge.innerText = "N/A";
+                    bioMatchBadge.className = "badge label-trace";
+                    bioLivenessBadge.innerText = "N/A";
+                    bioLivenessBadge.className = "badge label-trace";
+                    bioFeedbackText.innerText = "Enroll voice signature to enable biometric security.";
+                    
+                    // Clear the Security Audit Logs in the dashboard UI
+                    const container = document.getElementById("bio-audit-logs");
+                    if (container) {
+                        container.innerHTML = `<div class="audit-row-empty">No security logs recorded yet.</div>`;
+                    }
+                });
+        });
+
+        // Setup Biometrics actions event listeners
+        enrollBioBtn.addEventListener("click", () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "start_enrollment" }));
+                
+                // Programmatically trigger recording
+                setTimeout(() => {
+                    if (!isRecording) {
+                        micBtn.click();
+                    }
+                }, 400);
+            } else {
+                alert("Voice Gateway not connected.");
+            }
+        });
+
+        clearBioBtn.addEventListener("click", () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "clear_biometrics" }));
+                
+                // Clear the Security Audit Logs in the dashboard UI
+                const container = document.getElementById("bio-audit-logs");
+                if (container) {
+                    container.innerHTML = `<div class="audit-row-empty">No security logs recorded yet.</div>`;
+                }
+            } else {
+                alert("Voice Gateway not connected.");
+            }
+        });
+
+        // Step-up PIN Modal Controller
+        const pinOverlay = document.getElementById("pin-modal-overlay");
+        const pinCancelBtn = document.getElementById("pin-cancel-btn");
+        const pinSubmitBtn = document.getElementById("pin-submit-btn");
+        const pinDelBtn = document.getElementById("pin-del-btn");
+        const numKeys = document.querySelectorAll(".num-key");
+        
+        let enteredPin = "";
+        
+        function showPinModal() {
+            enteredPin = "";
+            updatePinDots();
+            pinOverlay.classList.add("active");
+        }
+        
+        function hidePinModal() {
+            pinOverlay.classList.remove("active");
+            enteredPin = "";
+            updatePinDots();
+        }
+        
+        function updatePinDots() {
+            for (let i = 0; i < 4; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (dot) {
+                    if (i < enteredPin.length) {
+                        dot.classList.add("filled");
+                    } else {
+                        dot.classList.remove("filled");
+                    }
+                }
+            }
+        }
+        
+        numKeys.forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (enteredPin.length < 4) {
+                    enteredPin += btn.getAttribute("data-val");
+                    updatePinDots();
+                }
+            });
+        });
+        
+        pinDelBtn.addEventListener("click", () => {
+            if (enteredPin.length > 0) {
+                enteredPin = enteredPin.slice(0, -1);
+                updatePinDots();
+            }
+        });
+        
+        pinCancelBtn.addEventListener("click", () => {
+            hidePinModal();
+            agentSpeechText.innerText = "Security authorization aborted.";
+        });
+        
+        pinSubmitBtn.addEventListener("click", () => {
+            if (enteredPin.length !== 4) {
+                alert("Please enter a valid 4-digit PIN.");
+                return;
+            }
+            
+            // Post verification to API
+            fetch("/api/verify_pin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    pin: enteredPin
+                })
+            })
+            .then(res => {
+                if (res.ok) {
+                    hidePinModal();
+                    agentSpeechText.innerText = "PIN authorized! Confirming transaction...";
+                    
+                    // Trigger a command confirmation over the WebSocket automatically
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            type: "message",
+                            text: "confirm" // The unlock keyword that triggers execute_payment
+                        }));
+                    }
+                } else {
+                    res.json().then(data => {
+                        alert("Authorization failed: " + (data.detail || "Invalid backup PIN."));
+                        enteredPin = "";
+                        updatePinDots();
+                    });
+                }
+            })
+            .catch(err => {
+                alert("Connection error during step-up PIN authorization.");
+                enteredPin = "";
+                updatePinDots();
+            });
+        });
+
+        // Debug Logger helper
+        function loggerLog(msg, obj = "") {
+            console.log("[Console Log]: " + msg, obj);
+        }
+    </script>
+</body>
+</html>

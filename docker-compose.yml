@@ -1,0 +1,209 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: voice_pay_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: razorpay_mock
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voice_pay_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: voice_pay_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voice_pay_network
+
+  bank_simulator:
+    build:
+      context: .
+      dockerfile: services/bank_simulator/Dockerfile
+    container_name: voice_pay_bank_simulator
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+    networks:
+      - voice_pay_network
+
+  risk_engine:
+    build:
+      context: .
+      dockerfile: services/risk_engine/Dockerfile
+    container_name: voice_pay_risk_engine
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+    networks:
+      - voice_pay_network
+
+  idempotency_service:
+    build:
+      context: .
+      dockerfile: services/idempotency_service/Dockerfile
+    container_name: voice_pay_idempotency
+    ports:
+      - "8005:8005"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - voice_pay_network
+
+  webhook_dispatcher:
+    build:
+      context: .
+      dockerfile: services/webhook_dispatcher/Dockerfile
+    container_name: voice_pay_webhook_dispatcher
+    ports:
+      - "8006:8006"
+    environment:
+      - PORT=8006
+      - MERCHANT_WEBHOOK_URL=http://merchant_app:8080/webhooks/payment
+      - AGENT_INTERNAL_WEBHOOK_URL=http://agent_core:8001/webhooks/internal
+    networks:
+      - voice_pay_network
+
+  mcp_server:
+    build:
+      context: .
+      dockerfile: services/mcp_server/Dockerfile
+    container_name: voice_pay_mcp_server
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/razorpay_mock
+      - RISK_ENGINE_URL=http://risk_engine:8004
+      - IDEMPOTENCY_SERVICE_URL=http://idempotency_service:8005
+      - BANK_SIMULATOR_URL=http://bank_simulator:8003
+      - WEBHOOK_DISPATCHER_URL=http://webhook_dispatcher:8006
+      - LIVE_MODE=false
+      - MAX_DEMO_AMOUNT=5000.0
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bank_simulator:
+        condition: service_started
+      risk_engine:
+        condition: service_started
+      idempotency_service:
+        condition: service_started
+      webhook_dispatcher:
+        condition: service_started
+    networks:
+      - voice_pay_network
+
+  agent_core:
+    build:
+      context: .
+      dockerfile: services/agent_core/Dockerfile
+    container_name: voice_pay_agent_core
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MCP_SERVER_URL=http://mcp_server:8002/sse
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      mcp_server:
+        condition: service_started
+    networks:
+      - voice_pay_network
+
+  voice_gateway:
+    build:
+      context: .
+      dockerfile: services/voice_gateway/Dockerfile
+    container_name: voice_pay_voice_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - AGENT_CORE_URL=http://agent_core:8001
+      - ASR_PROVIDER=${ASR_PROVIDER}
+      - TTS_PROVIDER=${TTS_PROVIDER}
+      - VAD_PROVIDER=${VAD_PROVIDER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      agent_core:
+        condition: service_started
+    networks:
+      - voice_pay_network
+
+  merchant_app:
+    build:
+      context: .
+      dockerfile: services/merchant_app/Dockerfile
+    container_name: voice_pay_merchant_app
+    ports:
+      - "8088:8080"
+    environment:
+      - PORT=8080
+      - WEBHOOK_SECRET=razorpay_webhook_secret_key_2026
+    networks:
+      - voice_pay_network
+
+  ledger_service:
+    build:
+      context: .
+      dockerfile: services/ledger_service/Dockerfile
+    container_name: voice_pay_ledger_service
+    ports:
+      - "8089:8089"
+    environment:
+      - PORT=8089
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/razorpay_mock
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WEBHOOK_SECRET=razorpay_webhook_secret_key_2026
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - voice_pay_network
+
+networks:
+  voice_pay_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

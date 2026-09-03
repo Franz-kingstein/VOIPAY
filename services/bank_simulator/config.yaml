@@ -1,0 +1,6 @@
+latency_ms:
+  min: 800
+  max: 2500
+decline_rate: 0.03
+mandate_limits:
+  max_single_amount: 100000.0
