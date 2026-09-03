@@ -1,11 +1,11 @@
-# 🦝 Raccon (`voipay`)
+<div align="center">
 
-> **Project Codename**: `Raccon` | **Product Name**: `voipay`  
-> *Next-Gen Autonomous Voice-Biometric Payment Agent powered by Pydantic AI, FastMCP, Real-Time DSP Liveness Math, and RBI/NPCI Guardrails.*
+<img src="docs/assets/voipay_logo.png" alt="VoiPay Logo" width="380" />
+
+### Next-Gen Autonomous Voice-Biometric Payment Agent
+*Project Codename: **Raccon** | Product Name: **VoiPay***
 
 ---
-
-<div align="center">
 
 ![Pydantic AI](https://img.shields.io/badge/Agent_Framework-Pydantic_AI-FF4B4B?style=for-the-badge&logo=pydantic)
 ![MCP Standard](https://img.shields.io/badge/Protocol-Model_Context_Protocol_(MCP)-8A2BE2?style=for-the-badge)
@@ -18,30 +18,30 @@
 
 ---
 
-## 🌟 1. Overview & Innovation
+## Executive Overview & Core Innovation
 
-**`voipay`** (built under project codename **`Raccon`**) is a voice-first conversational payment platform that enables secure, voice-driven UPI transactions. It combines real-time **Digital Signal Processing (DSP) voice biometrics**, **deepfake liveness protection**, an **autonomous agent reasoning core**, and a **Model Context Protocol (MCP)** tool execution architecture.
+**VoiPay** (built under project codename **Raccon**) is a voice-first conversational payment platform designed for zero-friction, highly secure UPI transactions. It unifies **Digital Signal Processing (DSP) voice biometrics**, **deepfake liveness math**, **Pydantic AI agent reasoning**, and a **Model Context Protocol (MCP)** execution pipeline into a resilient financial architecture.
 
-```
-                  ┌──────────────────────────────────────────────┐
-                  │               🦝 RACCON AGENT               │
-                  │   Voice Input ➔ DSP Math ➔ LLM ➔ MCP ➔ NPCI   │
-                  └──────────────────────────────────────────────┘
-```
-
-### 💡 Core Innovations:
-1. **Zero-Latency Voice Biometrics DSP**: Pure mathematical feature extraction (13-dim MFCCs) with volume independence, eliminating reliance on heavy external voice models for baseline verification.
-2. **Mathematical Deepfake & Replay Defense**: Autocorrelation pitch-jitter evaluation ($F_0$) combined with spectral energy bound analysis to detect AI voice clones and speaker playback attacks.
-3. **Non-Bypassable MCP Guardrails**: Decoupled tool execution where MCP tools independently verify user confirmation in Redis before executing debits—making LLM hallucination or prompt injection attacks impossible.
-4. **Passive AI Expense Ledger**: Automated category and nature (**WANT**, **NEED**, **MUST**) tagging from voice payment webhooks, supporting real-time conversational budget queries (*"How much did I spend this week?"*).
+### Key Technological Innovations
+- **Zero-Latency Voice Biometrics DSP**: Pure mathematical feature extraction (13-dim MFCCs) with volume independence, eliminating reliance on heavy external voice models for baseline verification.
+- **Mathematical Deepfake & Replay Defense**: Autocorrelation pitch-jitter evaluation ($F_0$) combined with spectral energy bound analysis to detect AI voice clones and speaker playback attacks.
+- **Non-Bypassable MCP Guardrails**: Decoupled tool execution where MCP tools independently verify user confirmation in Redis before executing debits—making LLM hallucination or prompt injection attacks impossible.
+- **Passive AI Expense Ledger**: Automated category and nature (**WANT**, **NEED**, **MUST**) tagging from voice payment webhooks, supporting real-time conversational budget queries (*"How much did I spend this week?"*).
 
 ---
 
-## 🏗️ 2. System Architecture
+## System Architecture
+
+<div align="center">
+  <img src="docs/assets/voipay_architecture.png" alt="VoiPay Architecture Diagram" width="100%" />
+</div>
+
+<details>
+<summary>Click to view interactive Mermaid diagram specification</summary>
 
 ```mermaid
 graph TD
-    User([🎙️ User Voice / Text]) --> VG[Voice Gateway - WebSocket]
+    User([User Voice / Text]) --> VG[Voice Gateway - WebSocket]
     VG -->|VAD Slices| ASR[Streaming ASR Engine]
     ASR -->|Transcripts & Audio| AC[Agent Core - Pydantic AI]
     
@@ -68,33 +68,51 @@ graph TD
     TTS -->|Voice Audio Stream| User
 ```
 
+</details>
+
 ---
 
-## 📐 3. Mathematical Innovation (Voice Biometrics & Liveness DSP)
+## User Interface & Interactive Experience
 
-Unlike traditional text systems that rely solely on passwords, `voipay` evaluates human acoustic physics and signal dynamics in real-time.
+<div align="center">
+  <img src="docs/assets/ui_dashboard.png" alt="VoiPay Glassmorphism Dashboard" width="95%" />
+  <p><em>Real-Time Glassmorphic Dashboard with Live SSE Transaction Waterfalls & Security Audit Logs</em></p>
+</div>
 
-### A. 13-Dimensional MFCC Vocal Fingerprinting
-1. **Mel-Scale Frequency Transformation**: Audio frames are transformed into the frequency domain via FFT and mapped to the human auditory Mel scale.
-2. **Gain/Volume Independence**: The 0th coefficient ($c_0$) is discarded to ensure shouting or whispering does not alter the fingerprint vector $\mathbf{v} \in \mathbb{R}^{12}$.
-3. **Euclidean Vector Match**:
-   $$d(\mathbf{v}_{\text{test}}, \mathbf{v}_{\text{enrolled}}) = \sqrt{\sum_{i=1}^{12} (v_{\text{test}, i} - v_{\text{enrolled}, i})^2}$$
-   $$\text{Confidence Score} = \max\left(0, 100.0 - d \times 1.67\right)$$
+<br />
 
-### B. Deepfake AI Clone Defense (Pitch Jitter Autocorrelation)
+<div align="center">
+  <img src="docs/assets/pin_stepup.png" alt="VoiPay Step-up PIN Modal" width="48%" />
+  <p><em>Step-up 4-Digit Security PIN Modal Triggered Automatically on Borderline Biometric Matches</em></p>
+</div>
+
+---
+
+## Mathematical Innovation (Voice Biometrics & Liveness DSP)
+
+Unlike traditional systems that rely solely on passwords, VoiPay evaluates human acoustic physics and signal dynamics in real-time.
+
+### 1. 13-Dimensional MFCC Vocal Fingerprinting
+- **Mel-Scale Frequency Transformation**: Audio frames are transformed into the frequency domain via FFT and mapped to the human auditory Mel scale.
+- **Gain/Volume Independence**: The 0th coefficient ($c_0$) is discarded to ensure shouting or whispering does not alter the fingerprint vector $\mathbf{v} \in \mathbb{R}^{12}$.
+- **Euclidean Vector Match**:
+  $$d(\mathbf{v}_{\text{test}}, \mathbf{v}_{\text{enrolled}}) = \sqrt{\sum_{i=1}^{12} (v_{\text{test}, i} - v_{\text{enrolled}, i})^2}$$
+  $$\text{Confidence Score} = \max\left(0, 100.0 - d \times 1.67\right)$$
+
+### 2. Deepfake AI Clone Defense (Pitch Jitter Autocorrelation)
 Synthetic Voice / Text-to-Speech (TTS) models generate clock-timed, unnaturally flat fundamental pitch frequencies ($F_0$).
 $$\text{StDev}(F_0) < 4.0\text{ Hz} \implies \text{Flagged as AI Deepfake Clone}$$
 
-### C. Replay Attack Spectrum Bounds
+### 3. Replay Attack Spectrum Bounds
 Physical playback speakers (smartphones, laptops) suffer from hardware frequency attenuation:
 $$\text{Energy Ratio}_{\text{Treble}} = \frac{E(f > 7.5\text{kHz})}{E_{\text{total}}} \quad \text{and} \quad \text{Energy Ratio}_{\text{Bass}} = \frac{E(f < 100\text{Hz})}{E_{\text{total}}}$$
 Depleted ratios indicate pre-recorded speaker playback.
 
 ---
 
-## 🤖 4. Autonomous Agent Architecture (Pydantic AI vs. LangGraph / CrewAI)
+## Agent Framework: Pydantic AI vs. LangGraph / CrewAI
 
-We deliberately chose **Pydantic AI** over graph-based frameworks like LangGraph or CrewAI.
+We deliberately chose **Pydantic AI** over graph-based frameworks like LangGraph or CrewAI for low-latency streaming voice applications.
 
 | Feature | Pydantic AI (Chosen) | LangGraph / CrewAI |
 | :--- | :--- | :--- |
@@ -104,11 +122,11 @@ We deliberately chose **Pydantic AI** over graph-based frameworks like LangGraph
 | **Deterministic Guardrails** | Strong schema enforcement | Probabilistic agent transitions |
 
 > [!TIP]
-> **Why Pydantic AI?** In voice-driven payments, latency is critical. Pydantic AI allows us to run structured tool execution with zero graph traversal overhead while maintaining type-safe dependency injection.
+> In voice-driven payments, latency is critical. Pydantic AI allows us to run structured tool execution with zero graph traversal overhead while maintaining type-safe dependency injection.
 
 ---
 
-## 🔌 5. Model Context Protocol (MCP) Standard
+## Model Context Protocol (MCP) Integration
 
 We decoupled payment execution logic into a standardized **FastMCP Server** (SSE Transport).
 
@@ -126,14 +144,13 @@ We decoupled payment execution logic into a standardized **FastMCP Server** (SSE
 ```
 
 > [!IMPORTANT]
-> **Non-Bypassable Security Architecture**:
-> Even if an LLM is subjected to prompt injection or hallucination, the MCP `execute_payment` tool performs a mandatory cryptographic check against Redis for `payment_confirmed == True`. The LLM **cannot** execute debits independently.
+> Even if an LLM is subjected to prompt injection or hallucination, the MCP `execute_payment` tool performs a mandatory cryptographic check against Redis for `payment_confirmed == True`. The LLM cannot execute debits independently.
 
 ---
 
-## 🛡️ 6. Security Measures, Guardrails & RBI / NPCI Compliance
+## Security, Guardrails & RBI / NPCI Compliance
 
-`voipay` strictly adheres to Reserve Bank of India (RBI) and NPCI UPI regulatory guidelines:
+VoiPay strictly adheres to Reserve Bank of India (RBI) and NPCI UPI regulatory guidelines:
 
 - **RBI 2FA / Additional Factor of Authentication (AFA)**:
   - **Factor 1**: Voice Biometrics + Liveness DSP.
@@ -146,28 +163,28 @@ We decoupled payment execution logic into a standardized **FastMCP Server** (SSE
 
 ---
 
-## 🧰 7. Tech Stack
+## Technology Stack
 
-- **Framework**: Python 3.11+, Pydantic AI, FastMCP, FastAPI
-- **Data & Caching**: PostgreSQL 15, Redis 7 (db:0 for Idempotency, db:1 for Sessions)
+- **Core Frameworks**: Python 3.11+, Pydantic AI, FastMCP, FastAPI
+- **Databases & Caching**: PostgreSQL 15, Redis 7 (db:0 for Idempotency, db:1 for Sessions)
 - **Signal Processing**: NumPy, SciPy (FFT, MFCCs, Autocorrelation Pitch Jitter)
 - **Machine Learning**: Scikit-Learn (IsolationForest Anomaly Model)
-- **Frontend**: HTML5, Vanilla JS, CSS Glassmorphism, WebSockets, Real-time SSE
+- **Frontend & Interface**: HTML5, Vanilla JS, CSS Glassmorphism, WebSockets, Real-time SSE
 - **Orchestration**: Docker, Docker Compose
 
 ---
 
-## 📈 8. Future Scope & Roadmap
+## Future Scope & Roadmap
 
-- [ ] **Multi-Speaker Voice Diarization**: Split restaurant bills by identifying multiple distinct speakers in a single audio stream.
-- [ ] **On-Device Edge Biometrics (WASM / TFLite)**: Run signal processing directly in the browser/mobile device for 100% offline biometric privacy.
-- [ ] **UPI International & Cross-Border FX**: Real-time currency conversions for cross-border UPI payments.
-- [ ] **Predictive AI Cashflow Guard**: Proactive warnings when recurring payments might conflict with projected account balance thresholds.
+- **Multi-Speaker Voice Diarization**: Split restaurant bills by identifying multiple distinct speakers in a single audio stream.
+- **On-Device Edge Biometrics (WASM / TFLite)**: Run signal processing directly in the browser/mobile device for 100% offline biometric privacy.
+- **UPI International & Cross-Border FX**: Real-time currency conversions for cross-border UPI payments.
+- **Predictive AI Cashflow Guard**: Proactive warnings when recurring payments might conflict with projected account balance thresholds.
 
 ---
 
 <div align="center">
 
-**Built with ❤️ for Razorpay AI Buildathon 2026**
+*VoiPay — Powered by Raccon Architecture*
 
 </div>
