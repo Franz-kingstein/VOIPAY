@@ -280,6 +280,22 @@ async def chat(req: ChatRequest):
                 reply.spoken_text = f"[Live API Warning: {str(live_err)}] " + reply.spoken_text
                 session_state = get_session_data(req.session_id)
                 
+        # Post-Processing English Sanitizer: Guarantee spoken_text is strictly plain English
+        if any('\u0900' <= char <= '\u097F' for char in reply.spoken_text) or any('\u0B80' <= char <= '\u0BFF' for char in reply.spoken_text) or any('\u00C0' <= char <= '\u024F' for char in reply.spoken_text):
+            logger.warning(f"Sanitizing non-English output: '{reply.spoken_text}' to plain English.")
+            if reply.action == "step_up":
+                reply.spoken_text = "Security verification requires backup authorization. Please enter your 4-digit PIN on the screen."
+            elif reply.action == "done" and reply.error:
+                reply.spoken_text = "Access denied: Security validation failed. Voice biometric profile does not match the enrolled owner."
+            elif reply.action == "done":
+                reply.spoken_text = "Transaction processed successfully."
+            elif reply.action == "confirm":
+                reply.spoken_text = f"Do you confirm initiating this payment?"
+            elif reply.action == "ask":
+                reply.spoken_text = "Please state the payee name and the amount you would like to pay."
+            else:
+                reply.spoken_text = "Processing your payment request in English."
+
         # Log the full structured AgentReply output before serialization
         logger.info(f"AgentReply output: {reply}")
             
