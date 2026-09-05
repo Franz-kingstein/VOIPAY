@@ -199,7 +199,8 @@ async def chat(req: ChatRequest):
     pending = session_state.get("pending_payment")
     
     # Proactive Reset: If starting a new payment command, clear any old stale history
-    is_new_payment_command = any(word in message_lower for word in ["pay", "send", "give", "transfer"]) and any(char.isdigit() for char in message_lower)
+    number_terms = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "thousand", "rupees"]
+    is_new_payment_command = any(word in message_lower for word in ["pay", "send", "give", "transfer"]) or (any(term in message_lower for term in number_terms) and any(kw in message_lower for kw in ["rupees", "pay", "to"]))
     if is_new_payment_command:
         logger.info(f"New payment command detected. Clearing old agent history to isolate transaction.")
         session_state["agent_history"] = None
