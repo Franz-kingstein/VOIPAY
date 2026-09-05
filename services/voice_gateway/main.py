@@ -314,6 +314,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                         "message": transcript,
                                         "token": session_token,
                                         "metadata": {
+                                            "preferred_language": "en",
                                             "biometrics": {
                                                 "passed": biometrics_passed,
                                                 "liveness_passed": liveness_passed,
