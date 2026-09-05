@@ -135,8 +135,16 @@ def extract_voice_template(pcm_bytes: bytes, sample_rate: int = 16000) -> dict:
     if len(mfcc_list) == 0:
         return None
         
-    # 1. Biometric vocal tract vector (Average MFCCs across all frames)
-    mean_mfccs = np.mean(mfcc_list, axis=0)
+    # 1. Biometric vocal tract vector (Average MFCCs across voiced speech frames only)
+    rms_arr = np.array(rms_list)
+    max_rms = float(np.max(rms_arr)) if len(rms_arr) > 0 else 1.0
+    voiced_indices = [i for i, r in enumerate(rms_list) if r >= 0.05 * max_rms]
+    
+    if len(voiced_indices) > 0:
+        voiced_mfccs = [mfcc_list[i] for i in voiced_indices]
+        mean_mfccs = np.mean(voiced_mfccs, axis=0)
+    else:
+        mean_mfccs = np.mean(mfcc_list, axis=0)
     
     # 1.5 Speech Cadence (Prosody / Rhythm) Analysis
     duration = len(signal) / sample_rate

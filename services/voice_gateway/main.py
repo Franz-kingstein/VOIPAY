@@ -401,7 +401,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                     })
                     continue
                 
-                if msg_type == "text_input":
+                if msg_type in ("text_input", "message"):
                     text_msg = data.get("text")
                     logger.info(f"Received text input from client: '{text_msg}'")
                     
