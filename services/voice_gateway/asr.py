@@ -121,7 +121,7 @@ class GeminiASR(ASRAdapter):
                             }
                         },
                         {
-                            "text": "Transcribe this audio recording accurately. The supported languages are English and Tamil only. Output ONLY the plain verbatim transcription text (in English or native Tamil script). Do not output any other language or commentary."
+                            "text": "Transcribe this audio recording accurately in its original spoken language and script. Output ONLY the plain verbatim transcription text (in English, native Hindi Devanagari, Tamil, Telugu, Kannada, Spanish, etc.). Do not add any extra commentary or translations."
                         }
                     ]
                 }]

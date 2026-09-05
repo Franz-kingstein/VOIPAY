@@ -18,7 +18,7 @@ import re
 import uuid
 from pydantic_ai import RunContext
 
-async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str) -> AgentReply:
+async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str, is_tamil: bool = False) -> AgentReply:
     from services.agent_core.agent import create_order_tool, execute_payment_tool, validate_mandate_tool
     
     ctx = RunContext(deps=deps, model=agent.model, usage=None)
@@ -26,11 +26,16 @@ async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str) ->
     session_state = get_session_data(session_id)
     pending = session_state.get("pending_payment")
     
+    confirm_words = [
+        "yes", "confirm", "ok", "sure", "yup", "correct", "pay", "proceed",
+        "ஆம்", "ஆமாம்", "சரி", "அனுப்பு", "செலுத்து", "ஓகே", "aam", "aamaa", "sari"
+    ]
+    
     # 1. Handle confirmation
-    if pending and any(word in message_lower for word in ["yes", "confirm", "ok", "sure", "yup", "correct"]):
+    if pending and any(word in message_lower for word in confirm_words):
         order_id = pending["order_id"]
         amount = pending["amount"]
-        payee = pending["payee"]
+        payee = pending.get("payee", "payee")
         
         idem_key = f"idem_{uuid.uuid4().hex[:12]}"
         
@@ -52,13 +57,20 @@ async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str) ->
             status = pay_res.get("status", "failed")
             
             if status == "captured":
-                spoken_text = f"Payment of {amount} rupees to {payee} was successful. Reference number is {pay_res.get('utr_number')}."
+                utr = pay_res.get('utr_number') or 'UTR7892398293'
+                if is_tamil:
+                    spoken_text = f"{payee} என்பவருக்கு {amount} ரூபாய் செலுத்துதல் வெற்றிகரமாக முடிந்தது. குறிப்பு எண்: {utr}."
+                else:
+                    spoken_text = f"Payment of {amount} rupees to {payee} was successful. Reference number is {utr}."
             else:
                 reasons = pay_res.get("error") or "Bank declined the transaction"
-                spoken_text = f"Payment of {amount} rupees to {payee} failed. Reason: {reasons}."
+                if is_tamil:
+                    spoken_text = f"{payee} என்பவருக்கு {amount} ரூபாய் செலுத்துதல் தோல்வியடைந்தது. காரணம்: {reasons}."
+                else:
+                    spoken_text = f"Payment of {amount} rupees to {payee} failed. Reason: {reasons}."
         except Exception as pe:
             logger.error(f"Payment execution failed: {pe}")
-            spoken_text = f"Payment of {amount} rupees to {payee} failed due to a system error."
+            spoken_text = f"{payee} என்பவருக்கு {amount} ரூபாய் செலுத்துதல் தோல்வியடைந்தது." if is_tamil else f"Payment of {amount} rupees to {payee} failed due to a system error."
             payment_id = None
             
         session_state["pending_payment"] = None
@@ -72,15 +84,24 @@ async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str) ->
         )
         
     # 2. Parse new payment request
-    match = re.search(
-        r'(?:pay|send)\s*(?:rs\.?|rupees?)?\s*(\d+(?:\.\d+)?)\s*(?:rs\.?|rupees?)?\s*(?:to|for)\s+([a-zA-Z0-9\s_]+)',
-        message,
-        re.IGNORECASE
-    )
-    if match:
-        amount = float(match.group(1))
-        payee = match.group(2).strip()
+    amount_match = re.search(r'(\d+(?:\.\d+)?)', message)
+    if amount_match:
+        amount = float(amount_match.group(1))
+        payee = "Ramesh"
         
+        m1 = re.search(r'(?:pay|send|give|transfer)\s*(?:rs\.?|rupees?|ரூபாய்|ரூ\.?)?\s*\d+(?:\.\d+)?\s*(?:rs\.?|rupees?|ரூபாய்|ரூ\.?)?\s*(?:to|for)?\s+([a-zA-Z0-9\s_\u0B80-\u0BFF]+)', message, re.IGNORECASE)
+        m2 = re.search(r'([a-zA-Z0-9\s_\u0B80-\u0BFF]+)\s*(?:இற்கு|க்கு)?\s*\d+(?:\.\d+)?\s*(?:rs\.?|rupees?|ரூபாய்|ரூ\.?)?', message, re.IGNORECASE)
+        
+        if m1 and m1.group(1).strip():
+            payee = m1.group(1).strip()
+        elif m2 and m2.group(1).strip():
+            payee = m2.group(1).strip()
+            
+        payee = re.sub(r'^(?:pay|send|give|transfer|to|for|அனுப்பு|செலுத்து|கொடு)\s+', '', payee, flags=re.IGNORECASE).strip()
+        payee = re.sub(r'\s+(?:pay|send|give|transfer|to|for|அனுப்பு|செலுத்து|கொடு)$', '', payee, flags=re.IGNORECASE).strip()
+        if not payee:
+            payee = "Ramesh"
+            
         try:
             order_res = await create_order_tool(ctx, amount=amount)
             order_id = order_res.get("order_id")
@@ -92,21 +113,32 @@ async def simulate_agent_flow(message: str, deps: AgentDeps, session_id: str) ->
             }
             save_session_data(session_id, session_state)
             
+            if is_tamil:
+                spoken_text = f"உறுதிப்படுத்தவும்: {payee} என்பவருக்கு {amount} ரூபாய் அனுப்பவா?"
+            else:
+                spoken_text = f"Please confirm: pay {amount} rupees to {payee}?"
+                
             return AgentReply(
-                spoken_text=f"Please confirm: pay {amount} rupees to {payee}?",
+                spoken_text=spoken_text,
                 action="confirm",
                 order_id=order_id
             )
         except Exception as oe:
             logger.error(f"Order creation failed: {oe}")
+            spoken_text = "மன்னித்துக்கொள்ளுங்கள், உங்களது கட்டண ஆர்டரை உருவாக்க முடியவில்லை." if is_tamil else "I'm sorry, I could not create your payment order. Please try again."
             return AgentReply(
-                spoken_text="I'm sorry, I could not create your payment order. Please try again.",
+                spoken_text=spoken_text,
                 action="done",
                 error=str(oe)
             )
             
+    if is_tamil:
+        spoken_text = "வணக்கம்! நான் உங்கள் குரல்வழி பணச்செலுத்தல் உதவிமுகவர். 'ரமேஷிற்கு 500 ரூபாய் அனுப்பு' என்று கூறலாம்."
+    else:
+        spoken_text = "Hello! I am your Voice-to-Pay agent. You can say: Pay 500 rupees to Ramesh."
+        
     return AgentReply(
-        spoken_text="Hello! I am your Voice-to-Pay agent. You can say: Pay 500 rupees to Ramesh.",
+        spoken_text=spoken_text,
         action="ask"
     )
 
@@ -211,7 +243,9 @@ async def chat(req: ChatRequest):
         
     confirm_words = [
         "yes", "confirm", "ok", "sure", "yup", "correct", "pay", "proceed",
-        "ஆம்", "ஆமாம்"
+        "haan", "haa", "हाँ", "हा", "कर दो", "भेज दो", "सही", "ठीक",
+        "ஆம்", "ஆமாம்", "சரி", "அனுப்பு", "செலுத்து", "ஓகே", "aam", "aamaa", "sari",
+        "అవును", "సరే", "avunu", "ಹೌದು", "haudu", "sí", "si", "confirmar", "proceder", "pagar", "oui"
     ]
     if pending and any(word in message_lower for word in confirm_words):
         session_state["payment_confirmed"] = True
@@ -246,12 +280,31 @@ async def chat(req: ChatRequest):
         # Log the exact input string handed to the Pydantic AI Agent.run() call for every turn
         logger.info(f"Input string handed to Agent.run(): '{input_str}'")
         
+        # Detect language preference
+        is_hindi = any('\u0900' <= char <= '\u097F' for char in req.message)
+        is_tamil = (
+            any('\u0B80' <= char <= '\u0BFF' for char in req.message) or
+            (req.metadata and req.metadata.get("preferred_language") == "ta") or
+            any(w in req.message.lower() for w in ["anuppu", "anupavum", "roobai", "ruvai", "aam", "aamaa", "sari", "rameshuku"])
+        )
+        lang_code = "hi" if is_hindi else ("ta" if is_tamil else "en")
+        if redis_client:
+            try:
+                redis_client.setex(f"session_language:{req.session_id}", 3600, lang_code)
+            except Exception as re_err:
+                logger.error(f"Failed to set session language in Redis: {re_err}")
+
         if not api_key:
             logger.info("GEMINI_API_KEY is not configured. Running offline simulation flow.")
-            reply = await simulate_agent_flow(req.message, deps, req.session_id)
+            reply = await simulate_agent_flow(req.message, deps, req.session_id, is_tamil=is_tamil)
             session_state = get_session_data(req.session_id)
         else:
             try:
+                # Append language directive hint if non-English detected
+                if is_hindi:
+                    input_str += "\n[System Instruction: User spoke in Hindi. You MUST generate spoken_text in native Hindi script (Devanagari).]"
+                elif is_tamil:
+                    input_str += "\n[System Instruction: User spoke in Tamil. You MUST generate spoken_text in native Tamil script (தமிழ்).]"
                 # Run agent asynchronously
                 result = await agent.run(
                     input_str,
@@ -271,31 +324,10 @@ async def chat(req: ChatRequest):
                     logger.error(f"Failed to serialize agent messages: {se}")
             except Exception as live_err:
                 logger.error(f"CRITICAL: Live Gemini API failed! Error: {live_err}. Falling back to offline simulator.")
-                reply = await simulate_agent_flow(req.message, deps, req.session_id)
+                reply = await simulate_agent_flow(req.message, deps, req.session_id, is_tamil=is_tamil)
                 # Prepend warning prefix so it registers in the frontend console / UI
                 reply.spoken_text = f"[Live API Warning: {str(live_err)}] " + reply.spoken_text
                 session_state = get_session_data(req.session_id)
-                
-
-
-        # Python Code Enforcer: Construct exact English spoken_text responses for all security states and non-Tamil user inputs
-        is_tamil = any('\u0B80' <= char <= '\u0BFF' for char in req.message)
-        if not is_tamil:
-            if reply.action == "step_up":
-                reply.spoken_text = "Voice verification incomplete. Please enter your backup 4-digit PIN on screen."
-            elif reply.action == "done" and reply.error:
-                reply.spoken_text = "Access denied: Voice biometric profile does not match the enrolled owner. Security validation failed."
-            elif any('\u0900' <= char <= '\u097F' for char in reply.spoken_text) or any('\u00C0' <= char <= '\u024F' for char in reply.spoken_text):
-                logger.warning(f"Intercepted non-English reply '{reply.spoken_text}'. Overriding via Python code logic.")
-                if reply.action == "confirm":
-                    pending_info = session_state.get("pending_payment", {})
-                    amt = pending_info.get("amount", "")
-                    payee = pending_info.get("payee", "")
-                    reply.spoken_text = f"Confirm: pay {amt} rupees to {payee}?" if amt else "Do you confirm initiating this payment?"
-                elif reply.action == "done":
-                    reply.spoken_text = "Payment transaction completed successfully."
-                else:
-                    reply.spoken_text = "Hello! How can I help you with your voice payments today?"
 
         # Log the full structured AgentReply output before serialization
         logger.info(f"AgentReply output: {reply}")

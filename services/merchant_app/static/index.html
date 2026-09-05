@@ -77,7 +77,10 @@
             <section class="panel voice-panel">
                 <div class="panel-header">
                     <h2><i class="fa-solid fa-microphone"></i> Voice Agent Controller</h2>
-                    <span class="badge label-gateway">Voice Gateway</span>
+                    <div>
+                        <span class="badge label-trace"><i class="fa-solid fa-language"></i> EN | தமிழ்</span>
+                        <span class="badge label-gateway">Voice Gateway</span>
+                    </div>
                 </div>
                 
                 <div class="mic-container">
@@ -288,6 +291,24 @@
         
         connectWebSocket();
 
+        function processIncomingAudioPacket(msg) {
+            if (msg.audio_chunks && Array.isArray(msg.audio_chunks) && msg.audio_chunks.length > 0) {
+                msg.audio_chunks.forEach(chunk => {
+                    if (chunk && chunk.audio) {
+                        enqueueAudio(chunk.audio, chunk.audio_mime);
+                    }
+                });
+            } else if (msg.audio) {
+                if (Array.isArray(msg.audio)) {
+                    msg.audio.forEach(item => {
+                        enqueueAudio(item.audio || item, item.audio_mime || msg.audio_mime);
+                    });
+                } else {
+                    enqueueAudio(msg.audio, msg.audio_mime);
+                }
+            }
+        }
+
         function handleGatewayMessage(msg) {
             loggerLog("Message from Gateway: " + msg.type, msg);
             
@@ -299,11 +320,16 @@
                     bioSignatureBadge.innerText = "Enrolled";
                     bioSignatureBadge.className = "badge label-webhook";
                     bioFeedbackText.innerText = msg.msg || "Voice biometric signature is active and protecting your session.";
+                    // Auto-stop microphone when enrollment completes
+                    if (isRecording) {
+                        stopMicrophone();
+                    }
                 } else {
                     bioSignatureBadge.innerText = "Not Enrolled";
                     bioSignatureBadge.className = "badge label-warning";
                     bioFeedbackText.innerText = msg.msg || "Enroll voice signature to enable biometric security.";
                 }
+                processIncomingAudioPacket(msg);
             }
             else if (msg.type === "biometric_verification") {
                 lastBiometricResult = msg;
@@ -353,16 +379,10 @@
                     showPinModal();
                 }
                 
-                // Play audio bytes
-                if (msg.audio) {
-                    playAudioFromB64(msg.audio, msg.audio_mime);
-                }
+                processIncomingAudioPacket(msg);
             }
             else if (msg.type === "webhook_event") {
-                // Audio outcome played automatically from Redis Pub/Sub trigger
-                if (msg.audio) {
-                    playAudioFromB64(msg.audio, msg.audio_mime);
-                }
+                processIncomingAudioPacket(msg);
             }
             else if (msg.type === "error") {
                 asrText.innerText = "Error: " + msg.msg;
@@ -370,30 +390,71 @@
             }
         }
 
-        function playAudioFromB64(b64Data, mimeType) {
+        let ttsAudioQueue = [];
+        let isPlayingTts = false;
+
+        function interruptTts() {
+            ttsAudioQueue = [];
+            isPlayingTts = false;
+            if (ttsAudio) {
+                try {
+                    ttsAudio.pause();
+                    ttsAudio.currentTime = 0;
+                    ttsAudio.style.display = "none";
+                } catch(e) {}
+            }
+            loggerLog("TTS audio playback interrupted. Queue cleared.");
+        }
+
+        function enqueueAudio(b64Data, mimeType) {
+            if (!b64Data) return;
             if (isRecording) {
-                loggerLog("Skipping TTS audio playback because microphone is currently active.");
+                loggerLog("Skipping TTS audio enqueue because microphone is active.");
                 return;
             }
+            ttsAudioQueue.push({ b64Data, mimeType });
+            processAudioQueue();
+        }
+
+        function processAudioQueue() {
+            if (isPlayingTts || isRecording || ttsAudioQueue.length === 0) {
+                return;
+            }
+            const nextAudio = ttsAudioQueue.shift();
+            isPlayingTts = true;
+
             try {
-                const actualMime = mimeType || "audio/wav";
-                const audioSrc = "data:" + actualMime + ";base64," + b64Data;
-                
-                // Detailed error handler for diagnostics
+                const actualMime = nextAudio.mimeType || "audio/wav";
+                const audioSrc = "data:" + actualMime + ";base64," + nextAudio.b64Data;
+
                 ttsAudio.onerror = () => {
-                    if (ttsAudio.error) {
-                        loggerLog("Audio decoder error: code=" + ttsAudio.error.code + ", message=" + ttsAudio.error.message);
-                    } else {
-                        loggerLog("Audio decoder error occurred");
-                    }
+                    loggerLog("Audio decoder error during queue playback");
+                    isPlayingTts = false;
+                    processAudioQueue();
                 };
-                
+
+                ttsAudio.onended = () => {
+                    isPlayingTts = false;
+                    // Play next queued sentence after sentence 1 finishes cleanly
+                    processAudioQueue();
+                };
+
                 ttsAudio.src = audioSrc;
                 ttsAudio.style.display = "block";
-                ttsAudio.play().catch(e => loggerLog("Audio play policy blocked manual trigger: ", e));
-            } catch(err) {
-                loggerLog("Audio processing error: ", err);
+                ttsAudio.play().catch(e => {
+                    loggerLog("Audio play policy blocked trigger: ", e);
+                    isPlayingTts = false;
+                    processAudioQueue();
+                });
+            } catch (err) {
+                loggerLog("Audio processing error in queue: ", err);
+                isPlayingTts = false;
+                processAudioQueue();
             }
+        }
+
+        function playAudioFromB64(b64Data, mimeType) {
+            enqueueAudio(b64Data, mimeType);
         }
 
         // Programmatic synthesizer for a gentle, premium start beep
@@ -538,43 +599,42 @@
             return new Uint8Array(buf);
         }
 
+        function stopMicrophone() {
+            if (!isRecording) return;
+            isRecording = false;
+            micBtn.className = "mic-button idle";
+            micInstructions.innerText = "Click the orb to start speaking";
+            
+            if (audioProcessor) {
+                audioProcessor.disconnect();
+                audioProcessor.onaudioprocess = null;
+                audioProcessor = null;
+            }
+            if (audioInput) {
+                audioInput.disconnect();
+                audioInput = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            // Send stop sequence (a small binary chunk) to flush VAD immediately
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                const silence = new Uint8Array(100);
+                socket.send(silence);
+            }
+        }
+
         micBtn.addEventListener("click", async () => {
+            interruptTts();
             if (isRecording) {
-                // Stop recording
-                isRecording = false;
-                micBtn.className = "mic-button idle";
-                micInstructions.innerText = "Click the orb to start speaking";
-                
-                if (audioProcessor) {
-                    audioProcessor.disconnect();
-                    audioProcessor.onaudioprocess = null;
-                    audioProcessor = null;
-                }
-                if (audioInput) {
-                    audioInput.disconnect();
-                    audioInput = null;
-                }
-                if (audioStream) {
-                    audioStream.getTracks().forEach(track => track.stop());
-                    audioStream = null;
-                }
-                if (audioContext) {
-                    audioContext.close();
-                    audioContext = null;
-                }
-                
-                // Send stop sequence (a small binary chunk) to flush VAD immediately
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    const silence = new Uint8Array(100);
-                    socket.send(silence);
-                }
+                stopMicrophone();
             } else {
-                // Stop any playing TTS audio immediately
-                if (ttsAudio) {
-                    ttsAudio.pause();
-                    ttsAudio.currentTime = 0;
-                    loggerLog("Interrupted active TTS playback on mic start.");
-                }
                 try {
                     audioStream = await navigator.mediaDevices.getUserMedia({
                         audio: {
@@ -634,6 +694,9 @@
                         
                         // 2. Main speech energy gating loop
                         if (rms > speechThreshold) {
+                            if (isPlayingTts || ttsAudioQueue.length > 0) {
+                                interruptTts();
+                            }
                             lastSpeechTimestamp = Date.now();
                             micInstructions.innerText = "Listening... Speak now. Click orb again to stop and send.";
                         } else {
@@ -675,6 +738,7 @@
         // Setup Manual text submit
         textInputForm.addEventListener("submit", (e) => {
             e.preventDefault();
+            interruptTts();
             const text = manualText.value.trim();
             if (!text) return;
             
@@ -689,6 +753,12 @@
                 }));
             } else {
                 alert("Voice Gateway not connected yet. Check server status.");
+            }
+        });
+
+        manualText.addEventListener("input", () => {
+            if (isPlayingTts || ttsAudioQueue.length > 0) {
+                interruptTts();
             }
         });
 
@@ -848,6 +918,7 @@
 
         // Setup Biometrics actions event listeners
         enrollBioBtn.addEventListener("click", () => {
+            interruptTts();
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "start_enrollment" }));
                 
@@ -863,6 +934,7 @@
         });
 
         clearBioBtn.addEventListener("click", () => {
+            interruptTts();
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: "clear_biometrics" }));
                 
@@ -912,6 +984,7 @@
         
         numKeys.forEach(btn => {
             btn.addEventListener("click", () => {
+                interruptTts();
                 if (enteredPin.length < 4) {
                     enteredPin += btn.getAttribute("data-val");
                     updatePinDots();

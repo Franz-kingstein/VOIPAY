@@ -101,12 +101,43 @@ class MockTTS(TTSAdapter):
         return waveform.astype(np.float32)
 
 def detect_language(text: str) -> tuple[str, str]:
-    """Detect language for demo: Tamil if Tamil unicode script is present, otherwise default to English."""
-    # 1. Tamil script check
+    """Detect language for speech synthesis based on Unicode script ranges and language tokens."""
+    # 1. Hindi / Devanagari script check
+    if any('\u0900' <= char <= '\u097F' for char in text):
+        return 'hi', 'co.in'
+        
+    # 2. Tamil script check
     if any('\u0B80' <= char <= '\u0BFF' for char in text):
         return 'ta', 'co.in'
-        
-    # Default to Indian English accent for all demo interactions
+
+    # 3. Telugu script check
+    if any('\u0C00' <= char <= '\u0C7F' for char in text):
+        return 'te', 'co.in'
+
+    # 4. Kannada script check
+    if any('\u0C80' <= char <= '\u0CFF' for char in text):
+        return 'kn', 'co.in'
+
+    # 5. Malayalam script check
+    if any('\u0D00' <= char <= '\u0D7F' for char in text):
+        return 'ml', 'co.in'
+
+    # 6. Gujarati script check
+    if any('\u0A80' <= char <= '\u0AFF' for char in text):
+        return 'gu', 'co.in'
+
+    # 7. Bengali script check
+    if any('\u0980' <= char <= '\u09FF' for char in text):
+        return 'bn', 'co.in'
+
+    # 8. Spanish check (Spanish special characters or tokens)
+    text_lower = text.lower()
+    spanish_chars = ['¿', '¡', 'á', 'é', 'í', 'ó', 'ú', 'ñ']
+    spanish_words = ['hola', 'gracias', 'pagar', 'confirmar', 'por favor', 'cuánto', 'dinero', 'sí']
+    if any(char in text for char in spanish_chars) or any(w in text_lower for w in spanish_words):
+        return 'es', 'com'
+
+    # Default to Indian English accent
     return 'en', 'co.in'
 
 class GTTSAdapter(TTSAdapter):

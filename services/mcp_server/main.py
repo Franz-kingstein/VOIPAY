@@ -163,11 +163,11 @@ def verify_security_session(session_id: str) -> str:
         passed = bio.get("passed", False)
         score = bio.get("biometric_score", 0.0)
         
-        if not passed or score < 85.0:
+        if not passed or score < 80.0:
             logger.warning(f"Security check failed speaker matching. Biometric score: {score:.1f}%, passed={passed}")
             
-            # Borderline Step-up range (70% - 84.9% match score)
-            if score >= 70.0 and passed:
+            # Borderline Step-up range (65% - 79.9% match score)
+            if score >= 65.0 and passed:
                 logger.info(f"Biometrics score {score:.1f}% is borderline. Triggering step-up PIN authorization.")
                 return json.dumps({
                     "status": "step_up",

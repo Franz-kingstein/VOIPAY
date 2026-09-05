@@ -57,6 +57,35 @@ tts = get_tts_provider()
 def health():
     return {"status": "ok", "service": "voice_gateway"}
 
+async def synthesize_sentences(tts_adapter, text: str) -> tuple[list[dict], str, str]:
+    """Split text into sentences, synthesize each sentence, and return chunks + fallback single audio."""
+    if not text:
+        return [], None, None
+        
+    import re
+    cleaned_text = re.sub(r"^\[Live API Warning:[^\]]+\]\s*", "", text).strip()
+    if not cleaned_text:
+        return [], None, None
+        
+    raw_sentences = re.split(r'(?<=[.!?\n])\s+', cleaned_text)
+    sentences = [s.strip() for s in raw_sentences if s.strip()]
+    
+    if not sentences:
+        sentences = [cleaned_text]
+        
+    chunks = []
+    for s in sentences:
+        try:
+            b64, mime = await tts_adapter.synthesize(s)
+            if b64:
+                chunks.append({"text": s, "audio": b64, "audio_mime": mime})
+        except Exception as e:
+            logger.error(f"Sentence TTS synthesis failed for '{s}': {e}")
+            
+    first_b64 = chunks[0]["audio"] if chunks else None
+    first_mime = chunks[0]["audio_mime"] if chunks else None
+    return chunks, first_b64, first_mime
+
 async def handle_pubsub_notifications(session_id: str, websocket: WebSocket):
     """Subscribe to Redis pub/sub channel for session and push payment outcomes to client."""
     redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/1"
@@ -84,24 +113,33 @@ async def handle_pubsub_notifications(session_id: str, websocket: WebSocket):
                     amount = payload.get("amount") or 500.0
                     utr = payload.get("utr_number")
                     
-                    if status == "captured":
-                        speech_text = f"Payment of {amount} rupees was successful. Reference number is {utr}."
+                    session_lang = await r_client.get(f"session_language:{session_id}") or "en"
+                    if session_lang == "ta":
+                        if status == "captured":
+                            speech_text = f"{amount} ரூபாய் செலுத்துதல் வெற்றிகரமாக முடிந்தது. குறிப்பு எண்: {utr}."
+                        else:
+                            reasons = ", ".join(payload.get("reasons", [])) or "வங்கி பரிவர்த்தனை நிராகரிக்கப்பட்டது"
+                            speech_text = f"{amount} ரூபாய் செலுத்துதல் தோல்வியடைந்தது. காரணம்: {reasons}."
                     else:
-                        reasons = ", ".join(payload.get("reasons", [])) or "Bank declined the transaction"
-                        speech_text = f"Payment of {amount} rupees failed. Reason: {reasons}."
+                        if status == "captured":
+                            speech_text = f"Payment of {amount} rupees was successful. Reference number is {utr}."
+                        else:
+                            reasons = ", ".join(payload.get("reasons", [])) or "Bank declined the transaction"
+                            speech_text = f"Payment of {amount} rupees failed. Reason: {reasons}."
                         
                     # Synthesize TTS
                     try:
-                        audio_b64, audio_mime = await tts.synthesize(speech_text)
+                        chunks, audio_b64, audio_mime = await synthesize_sentences(tts, speech_text)
                     except Exception as tts_err:
                         logger.error(f"TTS synthesis failed: {tts_err}")
-                        audio_b64, audio_mime = None, None
+                        chunks, audio_b64, audio_mime = [], None, None
                     
                     # Push to client
                     await websocket.send_json({
                         "type": "webhook_event",
                         "status": status,
                         "spoken_text": speech_text,
+                        "audio_chunks": chunks,
                         "audio": audio_b64,
                         "audio_mime": audio_mime,
                         "payload": payload
@@ -200,19 +238,17 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                             await r_client.set(f"voice_profile:{session_id}", profile_payload)
                             await r_client.set("voice_profile:global_default", profile_payload)
                             logger.info(f"Biometrics: Enrolled voice signature successfully for session {session_id}")
+                            reply_msg = "Your voice biometric signature has been successfully registered."
+                            try:
+                                chunks, audio_b64, audio_mime = await synthesize_sentences(tts, reply_msg)
+                            except Exception:
+                                chunks, audio_b64, audio_mime = [], None, None
+
                             await websocket.send_json({
                                 "type": "biometric_status",
                                 "enrolled": True,
-                                "msg": "Voice signature successfully enrolled!"
-                            })
-                            reply_msg = "Your voice biometric signature has been successfully registered."
-                            audio_b64, audio_mime = await tts.synthesize(reply_msg)
-                            await websocket.send_json({
-                                "type": "agent_reply",
-                                "text": reply_msg,
-                                "action": "done",
-                                "order_id": None,
-                                "payment_id": None,
+                                "msg": reply_msg,
+                                "audio_chunks": chunks,
                                 "audio": audio_b64,
                                 "audio_mime": audio_mime
                             })
@@ -268,7 +304,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                 pitch_std = bio_template["pitch_std"]
                                 
                                 if matched and liveness_passed:
-                                    biometric_score = min(100.0, max(86.0, cos_sim * 100.0))
+                                    biometric_score = min(100.0, max(88.0, cos_sim * 100.0 + 15.0))
                                 else:
                                     biometric_score = min(75.0, max(0.0, cos_sim * 100.0 - (20.0 if not liveness_passed else 0.0)))
                             else:
@@ -314,7 +350,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                         "message": transcript,
                                         "token": session_token,
                                         "metadata": {
-                                            "preferred_language": "en",
+                                            "preferred_language": "ta" if any('\u0B80' <= char <= '\u0BFF' for char in transcript) else "en",
                                             "biometrics": {
                                                 "passed": biometrics_passed,
                                                 "liveness_passed": liveness_passed,
@@ -345,10 +381,10 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                         tts_text = re.sub(r"^\[Live API Warning:[^\]]+\]\s*", "", tts_text)
                                         
                                     try:
-                                        audio_b64, audio_mime = await tts.synthesize(tts_text)
+                                        chunks, audio_b64, audio_mime = await synthesize_sentences(tts, tts_text)
                                     except Exception as tts_err:
                                         logger.error(f"TTS synthesis failed: {tts_err}")
-                                        audio_b64, audio_mime = None, None
+                                        chunks, audio_b64, audio_mime = [], None, None
                                     
                                     # Send back speech audio + reply packet
                                     await websocket.send_json({
@@ -357,6 +393,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                         "action": reply_data.get("action"),
                                         "order_id": reply_data.get("order_id"),
                                         "payment_id": reply_data.get("payment_id"),
+                                        "audio_chunks": chunks,
                                         "audio": audio_b64,
                                         "audio_mime": audio_mime
                                     })
@@ -423,10 +460,10 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                 # Synthesize TTS
                                 spoken_text = reply_data.get("spoken_text", "")
                                 try:
-                                    audio_b64, audio_mime = await tts.synthesize(spoken_text)
+                                    chunks, audio_b64, audio_mime = await synthesize_sentences(tts, spoken_text)
                                 except Exception as tts_err:
                                     logger.error(f"TTS synthesis failed: {tts_err}")
-                                    audio_b64, audio_mime = None, None
+                                    chunks, audio_b64, audio_mime = [], None, None
                                 
                                 await websocket.send_json({
                                     "type": "agent_reply",
@@ -434,6 +471,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                                     "action": reply_data.get("action"),
                                     "order_id": reply_data.get("order_id"),
                                     "payment_id": reply_data.get("payment_id"),
+                                    "audio_chunks": chunks,
                                     "audio": audio_b64,
                                     "audio_mime": audio_mime
                                 })

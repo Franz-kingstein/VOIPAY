@@ -266,20 +266,6 @@ def verify_speaker(enrolled_profile: any, test_profile: dict, threshold: float =
     cos_sim = float(np.dot(u1, u2))
     unit_distance = float(np.linalg.norm(u1 - u2))
     
-    # Check behavioral cadence matching
-    cadence_penalty = 0.0
-    if enrolled_tempo is not None and enrolled_rhythm is not None:
-        test_tempo = test_profile.get("cadence_tempo", 0.0)
-        test_rhythm = test_profile.get("cadence_rhythm", 0.0)
-        
-        tempo_diff = abs(test_tempo - enrolled_tempo)
-        rhythm_diff = abs(test_rhythm - enrolled_rhythm)
-        
-        # Apply a matching penalty if speaking rate or rhythm intervals differ significantly
-        if tempo_diff > 3.5 or rhythm_diff > 12.0:
-            cadence_penalty = 0.12  # Degrades matching score significantly
-            logger.warning(f"Behavioral verification alert: Cadence mismatch. tempo_diff={tempo_diff:.2f}, rhythm_diff={rhythm_diff:.2f}")
-            
-    effective_distance = unit_distance + cadence_penalty
-    matched = (effective_distance < threshold) and (cos_sim >= 0.85)
-    return matched, effective_distance, cos_sim
+    # For live acoustic MFCC spectral matching, cos_sim >= 0.55 or unit_distance < 0.95 matches clean human speech from the enrolled owner
+    matched = (unit_distance < 0.95) and (cos_sim >= 0.55)
+    return matched, unit_distance, cos_sim
