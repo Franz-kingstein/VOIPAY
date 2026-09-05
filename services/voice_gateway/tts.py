@@ -126,9 +126,11 @@ def detect_language(text: str) -> tuple[str, str]:
     if any('\u0A80' <= char <= '\u0AFF' for char in text):
         return 'gu', 'co.in'
         
-    # 8. Check for common Spanish keywords
+    # 8. Check for common Spanish keywords (whole word matching only)
+    import re
+    tokens = set(re.findall(r'\b\w+\b', text_lower))
     spanish_words = {"sí", "si", "gracias", "hola", "confirmar", "pagar", "rupias", "declinado", "dinero"}
-    if any(word in text_lower for word in spanish_words):
+    if any(word in tokens for word in spanish_words):
         return 'es', 'es'
         
     # Default to Indian English accent

@@ -225,39 +225,53 @@ def extract_voice_template(pcm_bytes: bytes, sample_rate: int = 16000) -> dict:
         "cadence_rhythm": cadence_rhythm
     }
  
-def verify_speaker(enrolled_profile: any, test_profile: dict, threshold: float = 24.0) -> tuple[bool, float]:
-    """Compare voice profiles using Euclidean MFCC distance and behavioral prosody cadence matching."""
-    # Handle backwards compatibility if enrolled_profile is just the raw MFCC list
+def verify_speaker(enrolled_profile: any, test_profile: dict, threshold: float = 0.52) -> tuple[bool, float, float]:
+    """Compare voice profiles using L2 unit-vector cosine distance and similarity, plus prosody cadence matching."""
     if isinstance(enrolled_profile, list):
         enrolled_fingerprint = enrolled_profile
         enrolled_tempo = None
         enrolled_rhythm = None
-    else:
-        enrolled_fingerprint = enrolled_profile["fingerprint"]
+    elif isinstance(enrolled_profile, dict):
+        enrolled_fingerprint = enrolled_profile.get("fingerprint", [])
         enrolled_tempo = enrolled_profile.get("cadence_tempo")
         enrolled_rhythm = enrolled_profile.get("cadence_rhythm")
-        
-    test_fingerprint = test_profile["fingerprint"]
-    test_tempo = test_profile.get("cadence_tempo", 0.0)
-    test_rhythm = test_profile.get("cadence_rhythm", 0.0)
+    else:
+        return False, 1.0, 0.0
+
+    test_fingerprint = test_profile.get("fingerprint", [])
+    if not enrolled_fingerprint or not test_fingerprint or len(enrolled_fingerprint) < 13 or len(test_fingerprint) < 13:
+        return False, 1.0, 0.0
     
     # Slice off the 0th coefficient to achieve volume-independent matching
-    vec1 = np.array(enrolled_fingerprint[1:])
-    vec2 = np.array(test_fingerprint[1:])
+    vec1 = np.array(enrolled_fingerprint[1:], dtype=np.float64)
+    vec2 = np.array(test_fingerprint[1:], dtype=np.float64)
     
-    distance = float(np.linalg.norm(vec1 - vec2))
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    
+    if norm1 < 1e-6 or norm2 < 1e-6:
+        return False, 1.0, 0.0
+
+    u1 = vec1 / norm1
+    u2 = vec2 / norm2
+    
+    cos_sim = float(np.dot(u1, u2))
+    unit_distance = float(np.linalg.norm(u1 - u2))
     
     # Check behavioral cadence matching
     cadence_penalty = 0.0
     if enrolled_tempo is not None and enrolled_rhythm is not None:
+        test_tempo = test_profile.get("cadence_tempo", 0.0)
+        test_rhythm = test_profile.get("cadence_rhythm", 0.0)
+        
         tempo_diff = abs(test_tempo - enrolled_tempo)
         rhythm_diff = abs(test_rhythm - enrolled_rhythm)
         
         # Apply a matching penalty if speaking rate or rhythm intervals differ significantly
-        if tempo_diff > 3.0 or rhythm_diff > 12.0:
-            cadence_penalty = 8.0  # Degrades matching score significantly
+        if tempo_diff > 3.5 or rhythm_diff > 12.0:
+            cadence_penalty = 0.12  # Degrades matching score significantly
             logger.warning(f"Behavioral verification alert: Cadence mismatch. tempo_diff={tempo_diff:.2f}, rhythm_diff={rhythm_diff:.2f}")
             
-    total_distance = distance + cadence_penalty
-    matched = total_distance < threshold
-    return matched, total_distance
+    effective_distance = unit_distance + cadence_penalty
+    matched = (effective_distance < threshold) and (cos_sim >= 0.85)
+    return matched, effective_distance, cos_sim

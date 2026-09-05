@@ -135,44 +135,52 @@ def verify_security_session(session_id: str) -> str:
         bio_key = f"session_biometrics:{session_id}"
         bio_str = r_client.get(bio_key)
         if not bio_str:
-            # Default fallback if no voice metadata recorded (e.g. text entry or not enrolled yet)
-            logger.info(f"Security PASS: No voice biometric metadata found (assuming text-based or first-time transaction).")
+            logger.warning(f"Security STEP_UP: No voice biometric metadata found for session {session_id}. Requiring PIN authorization.")
             return json.dumps({
-                "status": "success",
-                "msg": "Security verification passed (no biometrics restrictions found)."
+                "status": "step_up",
+                "msg": "Voice signature not enrolled. Backup PIN authorization required to proceed."
             })
             
         bio = json.loads(bio_str)
         
-        # 3. Enforce Liveness spoof checks
-        if bio.get("enrolled") or bio.get("is_synthetic") or bio.get("is_replay"):
-            if not bio.get("liveness_passed"):
-                logger.warning(f"Security BLOCK: Liveness check failed! synthetic={bio.get('is_synthetic')}, replay={bio.get('is_replay')}.")
-                return json.dumps({
-                    "status": "block",
-                    "msg": "Access Denied. Synthetic clone or replay voice signature detected."
-                })
+        # Check if user has enrolled their voice profile
+        if not bio.get("enrolled"):
+            logger.warning(f"Security STEP_UP: Voice signature not enrolled for session {session_id}.")
+            return json.dumps({
+                "status": "step_up",
+                "msg": "Voice biometric signature not registered. Please enroll your voice or enter backup PIN."
+            })
+        
+        # 3. Enforce Liveness spoof checks (Synthetic clone / Replay attack)
+        if bio.get("is_synthetic") or bio.get("is_replay") or not bio.get("liveness_passed"):
+            logger.warning(f"Security BLOCK: Liveness check failed! synthetic={bio.get('is_synthetic')}, replay={bio.get('is_replay')}.")
+            return json.dumps({
+                "status": "block",
+                "msg": "Access Denied. Synthetic clone or replay voice signature detected."
+            })
                 
-        # 4. Enforce Speaker Verification with Step-up PIN fallback
-        if bio.get("enrolled") and not bio.get("passed"):
-            score = bio.get("biometric_score", 0.0)
-            logger.warning(f"Security check failed speaker matching. Biometric score: {score:.1f}%")
+        # 4. Enforce Strict Speaker Verification
+        passed = bio.get("passed", False)
+        score = bio.get("biometric_score", 0.0)
+        
+        if not passed or score < 85.0:
+            logger.warning(f"Security check failed speaker matching. Biometric score: {score:.1f}%, passed={passed}")
             
-            # Borderline Step-up range (70% - 85% match score)
-            if score >= 70.0:
+            # Borderline Step-up range (70% - 84.9% match score)
+            if score >= 70.0 and passed:
                 logger.info(f"Biometrics score {score:.1f}% is borderline. Triggering step-up PIN authorization.")
                 return json.dumps({
                     "status": "step_up",
                     "msg": "Voice biometric verification is borderline. Backup PIN authorization required."
                 })
             else:
-                logger.warning(f"Biometrics score {score:.1f}% failed completely.")
+                logger.warning(f"Biometrics score {score:.1f}% failed speaker verification completely.")
                 return json.dumps({
                     "status": "block",
                     "msg": "Access Denied. Voice biometric profile does not match the enrolled owner."
                 })
                 
-        logger.info(f"Security PASS: Voice biometric verification passed with score {bio.get('biometric_score', 100.0):.1f}%.")
+        logger.info(f"Security PASS: Voice biometric verification passed with score {score:.1f}%.")
         return json.dumps({
             "status": "success",
             "msg": "Security verification passed. Voice biometric match successful."

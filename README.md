@@ -32,43 +32,42 @@
 
 ## System Architecture
 
-<div align="center">
-  <img src="docs/assets/voipay_architecture.png" alt="VoiPay Architecture Diagram" width="100%" />
-</div>
-
-<details>
-<summary>Click to view interactive Mermaid diagram specification</summary>
-
 ```mermaid
-graph TD
-    User([User Voice / Text]) --> VG[Voice Gateway - WebSocket]
-    VG -->|VAD Slices| ASR[Streaming ASR Engine]
-    ASR -->|Transcripts & Audio| AC[Agent Core - Pydantic AI]
-    
-    AC <-->|Session & Cart State| Redis[(Redis db:1)]
-    AC -->|Call Tools via SSE| MCP[FastMCP Server]
-    
-    subgraph Security & Execution Pipeline
-        MCP -->|13-dim MFCC & Pitch Jitter| Bio[Voice Biometrics DSP Engine]
-        MCP -->|Auth Validation| JWT[JWT Validator]
-        MCP -->|SQL Ledger & Audit Log| DB[(PostgreSQL 15)]
-        MCP -->|IsolationForest ML| RE[Risk Engine - RiskForge]
-        MCP -->|SETNX Payload Lock| ID[Idempotency Service - Redis db:0]
-        MCP -->|NPCI Debit Switch| BS[Bank Simulator - UPI ReservePay]
-    end
-    
-    BS -->|Transaction Status & UTR| MCP
-    MCP -->|Signed Webhook Event| WD[Webhook Dispatcher]
-    
-    WD -->|HMAC Webhook| MA[Merchant App SSE Dashboard]
-    WD -->|HMAC Webhook| LED[Ledger Service - Expense Tracker]
-    WD -->|Internal Callback| AC
-    
-    AC -->|Synthesize Native Reply| TTS[gTTS Speech Synth]
-    TTS -->|Voice Audio Stream| User
-```
+flowchart LR
+    A["User Voice Command"] --> B
 
-</details>
+    subgraph Agent_Core ["AI Agent Core"]
+        B["Conversational Reasoning<br/>• Intent Parsing & Memory<br/>• Dynamic MCP Tooling"]
+    end
+
+    B -->|FastMCP| C
+    B -->|FastMCP| I
+
+    subgraph Tools_Layer ["Execution Tools Layer"]
+        C{"13-D MFCC Voice Vector<br/>• Distance & Jitter Defense<br/>• Cadence Match"}
+        
+        D{"IsolationForest Anomaly Risk Model"}
+
+        E["Access Denied"]
+        F["4-Digit PIN StepUp"]
+        G["Razorpay & NPCI UPI Switch<br/>• Order & UTR Creation"]
+        
+        H["Webhook Dispatcher<br/>• Signed HMAC-SHA256"]
+        I["Personal Expense Ledger"]
+        J["Merchant App"]
+    end
+
+    C -->|Validated| D
+    
+    D -->|Score < 70%| E
+    D -->|Score >= 85%| G
+    D -->|Score 70-85%| F
+    
+    F -->|Valid| G
+    G --> H
+    H --> I
+    H --> J
+```
 
 ---
 

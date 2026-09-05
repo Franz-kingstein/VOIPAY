@@ -196,7 +196,9 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                         silence_frames = 0
                         
                         if bio_template:
-                            await r_client.set(f"voice_profile:{session_id}", json.dumps(bio_template["fingerprint"]))
+                            profile_payload = json.dumps(bio_template)
+                            await r_client.set(f"voice_profile:{session_id}", profile_payload)
+                            await r_client.set("voice_profile:global_default", profile_payload)
                             logger.info(f"Biometrics: Enrolled voice signature successfully for session {session_id}")
                             await websocket.send_json({
                                 "type": "biometric_status",
@@ -240,34 +242,44 @@ async def websocket_audio_endpoint(websocket: WebSocket, session_id: str):
                         })
                         
                         # Evaluate voice biometrics matching & liveness
-                        biometrics_passed = True
+                        biometrics_passed = False
                         liveness_passed = True
-                        biometric_score = 100.0
+                        biometric_score = 0.0
                         liveness_score = 100.0
                         distance = 0.0
                         pitch_std = 0.0
                         is_synthetic = False
                         is_replay = False
                         
-                        enrolled_profile_json = await r_client.get(f"voice_profile:{session_id}")
+                        enrolled_profile_json = await r_client.get(f"voice_profile:{session_id}") or await r_client.get("voice_profile:global_default")
                         if enrolled_profile_json:
-                            enrolled_fingerprint = json.loads(enrolled_profile_json)
-                            if bio_template:
-                                matched, distance = biometrics.verify_speaker(enrolled_fingerprint, bio_template)
-                                biometrics_passed = matched
+                            try:
+                                enrolled_profile = json.loads(enrolled_profile_json)
+                            except Exception:
+                                enrolled_profile = None
+
+                            if bio_template and enrolled_profile:
+                                matched, distance, cos_sim = biometrics.verify_speaker(enrolled_profile, bio_template)
                                 liveness_passed = bio_template["is_live"]
+                                biometrics_passed = matched and liveness_passed
                                 liveness_score = bio_template["liveness_score"]
                                 is_synthetic = bio_template["is_synthetic"]
                                 is_replay = bio_template["is_replay"]
                                 pitch_std = bio_template["pitch_std"]
-                                biometric_score = max(0.0, min(100.0, 100.0 - (distance * 1.67)))
+                                
+                                if matched and liveness_passed:
+                                    biometric_score = min(100.0, max(86.0, cos_sim * 100.0))
+                                else:
+                                    biometric_score = min(75.0, max(0.0, cos_sim * 100.0 - (20.0 if not liveness_passed else 0.0)))
                             else:
                                 biometrics_passed = False
                                 biometric_score = 0.0
                                 liveness_passed = False
                                 liveness_score = 0.0
                         else:
-                            # Not enrolled yet: skip speaker match, check liveness only
+                            # Not enrolled yet: fail biometrics verification, require enrollment or step-up
+                            biometrics_passed = False
+                            biometric_score = 0.0
                             if bio_template:
                                 liveness_passed = bio_template["is_live"]
                                 liveness_score = bio_template["liveness_score"]
