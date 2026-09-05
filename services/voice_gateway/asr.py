@@ -121,7 +121,7 @@ class GeminiASR(ASRAdapter):
                             }
                         },
                         {
-                            "text": "Transcribe this voice payment audio recording accurately. The primary default language is English (including payment terms like 'pay', 'rupees', numbers, and recipient names). Output ONLY the verbatim transcription text in plain English (or native Hindi/Tamil script if spoken in a regional language). Do not add any extra commentary or punctuation."
+                            "text": "Transcribe this audio recording accurately. The supported languages are English and Tamil only. Output ONLY the plain verbatim transcription text (in English or native Tamil script). Do not output any other language or commentary."
                         }
                     ]
                 }]
