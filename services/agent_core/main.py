@@ -278,19 +278,24 @@ async def chat(req: ChatRequest):
                 
 
 
-        # Strict Devanagari Filter: If Gemini LLM returns Devanagari script (Unicode range 0900-097F), convert to English
-        if any('\u0900' <= char <= '\u097F' for char in reply.spoken_text):
-            logger.warning(f"Devanagari text intercepted: '{reply.spoken_text}'. Converting to English.")
-            if reply.action == "done" and reply.error:
-                reply.spoken_text = "Security validation failed. Voice biometric profile does not match the enrolled owner. Access denied."
-            elif reply.action == "step_up":
+        # Python Code Enforcer: Construct exact English spoken_text responses for all security states and non-Tamil user inputs
+        is_tamil = any('\u0B80' <= char <= '\u0BFF' for char in req.message)
+        if not is_tamil:
+            if reply.action == "step_up":
                 reply.spoken_text = "Voice verification incomplete. Please enter your backup 4-digit PIN on screen."
-            elif reply.action == "confirm":
-                reply.spoken_text = "Do you confirm initiating this payment?"
-            elif reply.action == "done":
-                reply.spoken_text = "Payment processed successfully."
-            else:
-                reply.spoken_text = "Hello! How can I help you with your voice payments today?"
+            elif reply.action == "done" and reply.error:
+                reply.spoken_text = "Access denied: Voice biometric profile does not match the enrolled owner. Security validation failed."
+            elif any('\u0900' <= char <= '\u097F' for char in reply.spoken_text) or any('\u00C0' <= char <= '\u024F' for char in reply.spoken_text):
+                logger.warning(f"Intercepted non-English reply '{reply.spoken_text}'. Overriding via Python code logic.")
+                if reply.action == "confirm":
+                    pending_info = session_state.get("pending_payment", {})
+                    amt = pending_info.get("amount", "")
+                    payee = pending_info.get("payee", "")
+                    reply.spoken_text = f"Confirm: pay {amt} rupees to {payee}?" if amt else "Do you confirm initiating this payment?"
+                elif reply.action == "done":
+                    reply.spoken_text = "Payment transaction completed successfully."
+                else:
+                    reply.spoken_text = "Hello! How can I help you with your voice payments today?"
 
         # Log the full structured AgentReply output before serialization
         logger.info(f"AgentReply output: {reply}")
