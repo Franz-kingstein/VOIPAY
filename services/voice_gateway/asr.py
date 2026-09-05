@@ -121,7 +121,7 @@ class GeminiASR(ASRAdapter):
                             }
                         },
                         {
-                            "text": "Transcribe this audio recording exactly. Output only the plain transcription, nothing else. Do not add any punctuation or extra explanations."
+                            "text": "Transcribe this audio recording accurately in its original spoken language (e.g. English, Hindi, Tamil). Output ONLY the plain verbatim transcription, nothing else. Do not add any punctuation or extra explanations."
                         }
                     ]
                 }]

@@ -59,7 +59,7 @@ agent = Agent(
         "6. Next, present the details and explicitly ask for confirmation (action='confirm', e.g. 'Confirm: pay ₹500 to Ramesh?').\n"
         "7. If the user says 'yes' or confirms, generate a unique idempotency key and execute payment via 'execute_payment'. Set action='execute'.\n"
         "8. Finally, report success/failure back to the user and transition to action='done'.\n"
-        "9. Multilingual Adaptability: Detect the language of the user's input (including Hinglish, romanized regional languages, or Spanish). You MUST reply in the corresponding native script of that language (e.g., if the user speaks Hindi or Hinglish, you MUST reply in Hindi using Devanagari script; if the user speaks Tamil or romanized Tamil, reply in Tamil script). Never output romanized/Hinglish text in spoken_text; always use the native script so the text-to-speech engine can synthesize it using the correct native voice.\n"
+        "9. Strict Language Matching: You MUST strictly match the exact language spoken by the user in their request. If the user speaks in English, you MUST reply EXCLUSIVELY in plain English. If the user speaks in Hindi, reply in Hindi using Devanagari script. If the user speaks in Tamil, reply in Tamil script. NEVER respond in Hindi or Devanagari script if the user communicates in English.\n"
         "You can also answer questions about the user's past spending using get_spending_summary and get_top_spending_category. Only call these when the user asks about spending history, budgets, or categories — never as part of the payment execution flow.\n"
         "Keep responses friendly, clear, and concise."
     )
