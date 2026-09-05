@@ -211,11 +211,7 @@ async def chat(req: ChatRequest):
         
     confirm_words = [
         "yes", "confirm", "ok", "sure", "yup", "correct", "pay", "proceed",
-        "हां", "हाँ", "कर दो", "भुगतान करो",  # Hindi
-        "sí", "si", "confirmar", "proceder",   # Spanish
-        "ஆம்", "ஆமாம்",                       # Tamil
-        "అవును",                             # Telugu
-        "ಹೌದು"                               # Kannada
+        "ஆம்", "ஆமாம்"
     ]
     if pending and any(word in message_lower for word in confirm_words):
         session_state["payment_confirmed"] = True

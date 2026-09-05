@@ -101,39 +101,12 @@ class MockTTS(TTSAdapter):
         return waveform.astype(np.float32)
 
 def detect_language(text: str) -> tuple[str, str]:
-    """Detect language and TLD from unicode script ranges or keywords in text."""
-    text_lower = text.lower()
-    
-    # 1. Check for Devanagari script (Hindi, Marathi, Nepali)
-    if any('\u0900' <= char <= '\u097F' for char in text):
-        return 'hi', 'co.in'
-    # 2. Tamil script
+    """Detect language for demo: Tamil if Tamil unicode script is present, otherwise default to English."""
+    # 1. Tamil script check
     if any('\u0B80' <= char <= '\u0BFF' for char in text):
         return 'ta', 'co.in'
-    # 3. Telugu script
-    if any('\u0C00' <= char <= '\u0C7F' for char in text):
-        return 'te', 'co.in'
-    # 4. Kannada script
-    if any('\u0C80' <= char <= '\u0CFF' for char in text):
-        return 'kn', 'co.in'
-    # 5. Bengali script
-    if any('\u0980' <= char <= '\u09FF' for char in text):
-        return 'bn', 'co.in'
-    # 6. Malayalam script
-    if any('\u0D00' <= char <= '\u0D7F' for char in text):
-        return 'ml', 'co.in'
-    # 7. Gujarati script
-    if any('\u0A80' <= char <= '\u0AFF' for char in text):
-        return 'gu', 'co.in'
         
-    # 8. Check for common Spanish keywords (whole word matching only)
-    import re
-    tokens = set(re.findall(r'\b\w+\b', text_lower))
-    spanish_words = {"sí", "si", "gracias", "hola", "confirmar", "pagar", "rupias", "declinado", "dinero"}
-    if any(word in tokens for word in spanish_words):
-        return 'es', 'es'
-        
-    # Default to Indian English accent
+    # Default to Indian English accent for all demo interactions
     return 'en', 'co.in'
 
 class GTTSAdapter(TTSAdapter):

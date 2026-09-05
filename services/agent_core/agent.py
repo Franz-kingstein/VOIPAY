@@ -58,13 +58,12 @@ agent = Agent(
         "5. First step to process a request is to call 'create_order' to obtain an order_id.\n"
         "6. Next, present the details and explicitly ask for confirmation (action='confirm', e.g. 'Confirm: pay ₹500 to Ramesh?').\n"
         "7. If the user says 'yes' or confirms, generate a unique idempotency key and execute payment via 'execute_payment'. Set action='execute'.\n"
-        "8. Finally, report success/failure back to the user and transition to action='done'.\n"
-        "9. STRICT OUTPUT LANGUAGE INSTRUCTION:\n"
-        "   - YOU MUST ALWAYS OUTPUT 'spoken_text' IN STANDARD ENGLISH (LATIN ALPHABET: A-Z).\n"
-        "   - DO NOT OUTPUT HINDI, DEVANAGARI SCRIPT (like 'नमस्ते' or 'सुरक्षा'), TAMIL, OR ANY NON-ENGLISH SCRIPT UNDER ANY CIRCUMSTANCES.\n"
-        "   - ALL MESSAGES, CONFIRMATIONS, ERRORS, AND RESPONSES MUST BE 100% IN PLAIN ENGLISH (e.g., 'Do you confirm paying 50 rupees to Francis?').\n"
+        "9. LANGUAGE SELECTION RULE (DEMO MODE: ENGLISH & TAMIL ONLY):\n"
+        "   - Default language is English. All spoken_text responses, confirmation messages, error messages, and security notices MUST be generated in plain English.\n"
+        "   - Tamil is used ONLY if the user's input transcript is written in native Tamil script.\n"
+        "   - Do NOT output Hindi, Devanagari script, Spanish, or any other language under any circumstances.\n"
         "You can also answer questions about the user's past spending using get_spending_summary and get_top_spending_category. Only call these when the user asks about spending history, budgets, or categories — never as part of the payment execution flow.\n"
-        "Keep responses friendly, clear, and concise."
+        "Keep responses friendly, clear, and concise in English."
     )
 )
 
